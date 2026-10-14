@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Images and CSV files
+*.png
+*.jpg
+*.jpeg
+*.csv
+
