@@ -225,3 +225,5 @@ __marimo__/
 *.jpeg
 *.csv
 
+# results directory inside the ecmp-sim
+results/*
