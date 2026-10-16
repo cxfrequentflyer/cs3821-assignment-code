@@ -1,12 +1,25 @@
-The ecmp-sim directory contains the Python code for our simulation, to explore various questions as described in the proposal document.
-The ns-3-sim directory contains the relevant scratch code for the ns-3 simulation component.
+# COMP3821 26T3 - Assignment Code
 
-To run the ns-3 related experiments, download ns-3 version 3.49, and cd into ns-3.49
-Then run rm -rf scratch to remove the default provided scratch directory, then symlink the ns-3-sim directory provided in this repo to a symlink called scratch inside your ns3 directory.
+## Information:
+The ```ecmp-sim``` directory contains the Python code for our simulation, to explore various questions as described in the proposal document.
+The ```ns-3-sim``` directory contains the relevant scratch code for the ns-3 simulation component.
+
+## ns-3 Simulations:
+To run the ns-3 related experiments, download ns-3 version ```3.49``` and ```cd``` into ```ns-3.49```.
+Build it like this:
+
+```bash
+./ns3 configure --enable-examples --enable-tests
+./ns3 build
+./ns3 run first # to check that the core simulator is working correctly
+```
+Then run ```rm -rf scratch``` to remove the default provided ```scratch``` directory, then symlink the ```ns-3-sim``` directory provided in this repo to a symlink called ```scratch``` inside your ```ns-3.49``` directory.
 
 For example:
+```bash
 cd /path/to/ns-3.49
 rm -rf scratch
 ln -s ~/path/to/cs3821-assignment-code/ns-3-sim scratch
+```
 
 Instructions to run the ns-3 simulation coming soon.
