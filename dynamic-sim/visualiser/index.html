@@ -1,0 +1,1495 @@
+<title>Dynamic Balls Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a lab bench. The model's knobs sit on top, the apparatus (source, hashed
+   pipes, graduated tubes) is the one set-off object, readouts and the wait chart
+   run underneath it. */
+:root {
+  --bg: #edf1f4;
+  --panel: #fbfcfd;
+  --ink: #0f1923;
+  --ink-2: #4a5866;
+  --muted: #6f7c89;
+  --rule: #d8dfe6;
+  --rule-strong: #bfc9d3;
+  --hover: #e4eaef;
+  --glass: #9fb0c0;
+  --glass-fill: #f0f4f7;
+  --ball-serve: #2a78d6;
+  --ball-wait: #86b6ef;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --focus: #2a78d6;
+  --warn: #fab219;
+  --warn-ink: #5c3f00;
+  --warn-bg: #fff3d1;
+  --danger: #c03030;
+
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1117; --panel: #121a22; --ink: #e6edf3; --ink-2: #a5b2bf; --muted: #82909d;
+    --rule: #24303b; --rule-strong: #364452; --hover: #1b252f; --glass: #4f6072; --glass-fill: #0e151c;
+    --ball-serve: #5598e7; --ball-wait: #215faa; --series-1: #3987e5; --series-2: #d95926; --focus: #6da7ec;
+    --warn: #fab219; --warn-ink: #fbc54d; --warn-bg: #2a2110; --danger: #f07a7a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1117; --panel: #121a22; --ink: #e6edf3; --ink-2: #a5b2bf; --muted: #82909d;
+  --rule: #24303b; --rule-strong: #364452; --hover: #1b252f; --glass: #4f6072; --glass-fill: #0e151c;
+  --ball-serve: #5598e7; --ball-wait: #215faa; --series-1: #3987e5; --series-2: #d95926; --focus: #6da7ec;
+  --warn: #fab219; --warn-ink: #fbc54d; --warn-bg: #2a2110; --danger: #f07a7a;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.page {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 22px;
+}
+.page > * { min-width: 0; }
+
+/* masthead */
+.masthead { display: grid; gap: 6px; }
+.eyebrow {
+  font: 500 12px/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: 118%;
+  font-weight: 760;
+  font-size: clamp(28px, 4.2vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.lede { margin: 4px 0 0; max-width: 68ch; color: var(--ink-2); }
+
+h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-stretch: 112%;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.sub { margin: 2px 0 0; color: var(--ink-2); font-size: 14px; max-width: 70ch; }
+
+/* model controls */
+.controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px 28px;
+  padding-block: 16px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 920px) { .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .controls { grid-template-columns: minmax(0, 1fr); } }
+.ctl { display: grid; gap: 6px; align-content: start; min-width: 0; margin: 0; padding: 0; border: 0; }
+.ctl-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 8px; }
+.ctl-label, .ctl legend {
+  padding: 0;
+  font-family: var(--font-display);
+  font-stretch: 108%;
+  font-weight: 650;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.ctl legend { margin-bottom: 6px; }
+.numfield { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.numfield input {
+  width: 7ch;
+  padding: 3px 6px;
+  font: 500 14px var(--font-mono);
+  color: var(--ink);
+  text-align: right;
+  background: var(--panel);
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.numfield input::-webkit-outer-spin-button,
+.numfield input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.numfield input:hover { border-color: var(--muted); }
+.numfield input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.numfield input[aria-invalid="true"] { border-color: var(--danger); }
+.ctl-hint { font-size: 13px; color: var(--danger); }
+.ctl-foot { font-size: 13px; color: var(--muted); }
+.ctl-foot strong { color: var(--ink); font-weight: 600; }
+input[type="range"] { width: 100%; margin: 4px 0; accent-color: var(--ball-serve); }
+input[type="range"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
+
+.seg-opts {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.seg-opts input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.seg-opts label {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+.seg-opts label:hover { background: var(--hover); color: var(--ink); }
+.seg-opts input:checked + label { background: var(--ink); color: var(--panel); }
+.seg-opts input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+.btn {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--rule-strong);
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--hover); }
+.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+.btn-primary:hover { background: var(--ink-2); border-color: var(--ink-2); }
+.btn svg { width: 14px; height: 14px; flex: none; }
+
+/* the bench: the one set-off object */
+.bench {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.bench-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+.bench-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.bench-status { font-size: 14px; color: var(--ink-2); }
+.bench-status strong { color: var(--ink); font-weight: 650; }
+.inline-label { font-size: 13px; color: var(--muted); }
+.bench .seg-opts label { padding: 4px 10px; font-size: 13px; }
+.stage-scroll { overflow-x: auto; overflow-y: hidden; }
+.stage { position: relative; height: 440px; min-width: 100%; }
+@media (max-width: 560px) { .stage { height: 400px; } }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.cols { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; }
+.bincol {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+  will-change: transform;
+}
+.bin-name { font-size: 12px; color: var(--ink-2); white-space: nowrap; line-height: 16px; }
+.bin-name .eff { font: 500 11px var(--font-mono); color: var(--muted); margin-left: 4px; }
+.bin-wait { font: 500 13px/18px var(--font-mono); color: var(--ink); white-space: nowrap; }
+.bin-retire {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--rule-strong);
+  background: var(--panel);
+  color: var(--ink-2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.bin-retire:hover { background: var(--hover); color: var(--ink); }
+.bin-retire:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.bin-retire:disabled { opacity: 0.4; cursor: not-allowed; }
+.bin-retire svg { width: 10px; height: 10px; }
+.bin-status { font-size: 11px; line-height: 24px; color: var(--muted); font-style: italic; white-space: nowrap; }
+.cols[data-mode="compact"] .bin-name .word,
+.cols[data-mode="compact"] .bin-retire .word { display: none; }
+.cols[data-mode="compact"] .bin-name { font: 500 11px var(--font-mono); }
+.cols[data-mode="compact"] .bin-name .eff { margin-left: 1px; font-size: 10px; }
+.cols[data-mode="compact"] .bin-wait { font-size: 11px; }
+.cols[data-mode="compact"] .bin-retire { width: 24px; padding: 0; justify-content: center; }
+.placement {
+  margin: 0;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--rule);
+  font: 13px/1.5 var(--font-mono);
+  color: var(--ink-2);
+  min-height: 3.6em;
+}
+.placement b { font-family: var(--font-body); font-weight: 650; color: var(--ink); letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px; margin-right: 8px; }
+
+/* readouts */
+.readouts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 920px) { .readouts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tile { padding: 14px 16px 14px 0; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.tile + .tile { padding-left: 16px; border-left: 1px solid var(--rule); }
+@media (max-width: 920px) {
+  .tile, .tile + .tile { padding-left: 0; border-left: 0; }
+  .tile:nth-child(3n+2), .tile:nth-child(3n+3) { padding-left: 16px; border-left: 1px solid var(--rule); }
+}
+@media (max-width: 560px) {
+  .tile:nth-child(3n+2), .tile:nth-child(3n+3) { padding-left: 0; border-left: 0; }
+  .tile:nth-child(2n) { padding-left: 16px; border-left: 1px solid var(--rule); }
+}
+.tile-label {
+  font-family: var(--font-display);
+  font-stretch: 108%;
+  font-weight: 650;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tile-value { font-family: var(--font-display); font-weight: 650; font-size: 28px; line-height: 1.15; }
+.tile-sub { font-size: 13px; color: var(--muted); }
+.key { display: inline-block; width: 16px; height: 0; border-top: 2px solid; flex: none; }
+.key-1 { border-color: var(--series-1); }
+.key-2 { border-color: var(--series-2); }
+.key-t { border-top: 2px dashed var(--ink-2); }
+.chip-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  font-size: 12px;
+  font-weight: 600;
+  width: max-content;
+  max-width: 100%;
+}
+.chip-warn svg { width: 12px; height: 12px; flex: none; }
+
+/* chart */
+.chart-card {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 16px 16px 12px;
+  display: grid;
+  gap: 10px;
+}
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.chart-plot { position: relative; height: 236px; outline: none; }
+.chart-plot:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: 6px; }
+.chart-plot svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.c-grid { stroke: var(--rule); stroke-width: 1; }
+.c-base { stroke: var(--rule-strong); stroke-width: 1; }
+.c-tick { fill: var(--muted); font: 10px var(--font-mono); }
+.c-mark { stroke: var(--muted); stroke-width: 1; opacity: 0.5; }
+.c-mark-label { fill: var(--ink-2); font: 11px var(--font-body); }
+.c-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.c-cum { stroke: var(--series-1); }
+.c-recent { stroke: var(--series-2); }
+.c-theory { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.c-dot { stroke: var(--panel); stroke-width: 2; }
+.c-dot-1 { fill: var(--series-1); }
+.c-dot-2 { fill: var(--series-2); }
+.c-dot-t { fill: var(--ink-2); }
+.c-end { fill: var(--ink-2); font: 500 11px var(--font-mono); }
+.c-cross { stroke: var(--ink-2); stroke-width: 1; }
+.tooltip {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  pointer-events: none;
+  background: var(--panel);
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--ink-2);
+  box-shadow: 0 4px 14px rgba(15, 25, 35, 0.12);
+  min-width: 172px;
+  display: grid;
+  gap: 3px;
+}
+.tt-time { font: 500 11px var(--font-mono); color: var(--muted); }
+.tt-row { display: flex; align-items: center; gap: 8px; }
+.tt-row strong { font: 600 13px var(--font-mono); color: var(--ink); min-width: 42px; }
+.tt-ev { color: var(--ink); font-weight: 600; }
+
+/* bins table */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 7px 12px 7px 0; text-align: left; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th {
+  font-family: var(--font-display);
+  font-stretch: 108%;
+  font-weight: 650;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border-bottom-color: var(--rule-strong);
+}
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.num { font-family: var(--font-mono); font-size: 13px; }
+.pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-2);
+}
+.pill-drain { border-style: dashed; color: var(--muted); }
+
+.section { display: grid; gap: 10px; }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-2); max-width: 78ch; }
+.notes code { font: 13px var(--font-mono); color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bincol { will-change: auto; }
+}
+</style>
+
+<div class="page">
+  <header class="masthead">
+    <div class="eyebrow">dynamic-sim · balls into bins</div>
+    <h1>Dynamic Balls Simulator</h1>
+    <p class="lede">A single source hashes every ball into one or two bins, and the ball joins whichever has less work queued. Change the arrival rate, add or retire bins, and watch how long balls wait.</p>
+  </header>
+
+  <section class="controls" aria-label="Model settings">
+    <div class="ctl">
+      <div class="ctl-head">
+        <label class="ctl-label" for="rate">Arrival rate</label>
+        <span class="numfield"><input type="number" id="rateNum" min="0.1" max="100" step="0.1" value="7.2" inputmode="decimal" aria-label="Arrival rate, balls per unit time" aria-describedby="rateHint">per unit time</span>
+      </div>
+      <input type="range" id="rate" min="0.1" max="24" step="0.1" value="7.2">
+      <div class="ctl-hint" id="rateHint" hidden>Enter a rate from 0.1 to 100.</div>
+      <div class="ctl-foot" id="loadFoot">Load <strong>90%</strong> of capacity</div>
+    </div>
+    <fieldset class="ctl">
+      <legend>Choices per ball</legend>
+      <div class="seg-opts">
+        <input type="radio" name="choices" id="d1" value="1"><label for="d1">1 choice</label>
+        <input type="radio" name="choices" id="d2" value="2" checked><label for="d2">2 choices</label>
+      </div>
+      <div class="ctl-foot">Bins the hash picks for each ball.</div>
+    </fieldset>
+    <div class="ctl">
+      <div class="ctl-head">
+        <label class="ctl-label" for="sigma">Size spread σ</label>
+        <span class="numfield"><input type="number" id="sigmaNum" min="0" max="3" step="0.05" value="1.00" inputmode="decimal" aria-label="Size spread sigma" aria-describedby="sigmaHint"></span>
+      </div>
+      <input type="range" id="sigma" min="0" max="1.5" step="0.05" value="1">
+      <div class="ctl-hint" id="sigmaHint" hidden>Enter a spread from 0 to 3.</div>
+      <div class="ctl-foot">Log-normal sizes. The mean stays at 1.</div>
+    </div>
+    <fieldset class="ctl">
+      <legend>Gaps between balls</legend>
+      <div class="seg-opts">
+        <input type="radio" name="arrivals" id="arrP" value="poisson" checked><label for="arrP">Exponential</label>
+        <input type="radio" name="arrivals" id="arrC" value="constant"><label for="arrC">Constant</label>
+      </div>
+      <div class="ctl-foot">Exponential gaps make a Poisson stream.</div>
+    </fieldset>
+  </section>
+
+  <section class="bench" aria-label="Bins">
+    <div class="bench-bar">
+      <div class="bench-group">
+        <button class="btn btn-primary" id="pause" type="button" aria-pressed="false">
+          <svg viewBox="0 0 14 14" aria-hidden="true" id="pauseIcon"><rect x="3" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="8" y="2" width="3" height="10" rx="1" fill="currentColor"/></svg>
+          <span id="pauseText">Pause</span>
+        </button>
+        <div class="seg-opts" role="radiogroup" aria-label="Speed">
+          <input type="radio" name="speed" id="sp05" value="0.5"><label for="sp05">½×</label>
+          <input type="radio" name="speed" id="sp1" value="1" checked><label for="sp1">1×</label>
+          <input type="radio" name="speed" id="sp2" value="2"><label for="sp2">2×</label>
+          <input type="radio" name="speed" id="sp5" value="5"><label for="sp5">5×</label>
+        </div>
+        <button class="btn" id="reset" type="button">Reset averages</button>
+        <span class="bench-status" id="benchStatus"><strong>8</strong> bins taking balls</span>
+      </div>
+      <div class="bench-group">
+        <span class="inline-label" id="effLabel">New bin efficiency</span>
+        <div class="seg-opts" role="radiogroup" aria-labelledby="effLabel">
+          <input type="radio" name="eff" id="eff05" value="0.5"><label for="eff05">½×</label>
+          <input type="radio" name="eff" id="eff1" value="1" checked><label for="eff1">1×</label>
+          <input type="radio" name="eff" id="eff2" value="2"><label for="eff2">2×</label>
+        </div>
+        <button class="btn" id="addBin" type="button">
+          <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Add bin
+        </button>
+      </div>
+    </div>
+    <div class="stage-scroll" id="stageScroll">
+      <div class="stage" id="stage">
+        <canvas id="cv" role="img" aria-label="Bins drawn as graduated tubes. Each ball is a rectangle whose height is its size; the bottom ball in each tube is being processed and shrinks as it is worked on. The table further down lists the same numbers."></canvas>
+        <div class="cols" id="cols" data-mode="full"></div>
+      </div>
+    </div>
+    <p class="placement" id="placement" aria-live="off"><b>Last ball</b><span id="placementText">Waiting for the first ball.</span></p>
+  </section>
+
+  <section class="readouts" aria-label="Waiting time">
+    <div class="tile">
+      <div class="tile-label"><span class="key key-1" aria-hidden="true"></span>Mean wait</div>
+      <div class="tile-value" id="vCum">–</div>
+      <div class="tile-sub" id="sCum">since last reset</div>
+    </div>
+    <div class="tile">
+      <div class="tile-label"><span class="key key-2" aria-hidden="true"></span>Recent wait</div>
+      <div class="tile-value" id="vRecent">–</div>
+      <div class="tile-sub">mean of the last 200 balls</div>
+    </div>
+    <div class="tile">
+      <div class="tile-label"><span class="key key-t" aria-hidden="true"></span>One choice, theory</div>
+      <div class="tile-value" id="vTheory">–</div>
+      <div class="tile-sub" id="sTheory">M/G/1 mean wait per bin</div>
+    </div>
+    <div class="tile">
+      <div class="tile-label">Load</div>
+      <div class="tile-value" id="vLoad">–</div>
+      <div class="tile-sub" id="sLoad">arrival rate ÷ capacity</div>
+      <div class="chip-warn" id="warnLoad" hidden>
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1 11 10.5H1Z" fill="var(--warn)"/><path d="M6 4.5v3" stroke="var(--warn-bg)" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="9" r=".8" fill="var(--warn-bg)"/></svg>
+        Over capacity: queues keep growing
+      </div>
+    </div>
+    <div class="tile">
+      <div class="tile-label">In bins</div>
+      <div class="tile-value" id="vSys">–</div>
+      <div class="tile-sub" id="sSys">balls queued or in progress</div>
+    </div>
+  </section>
+
+  <section class="chart-card" aria-labelledby="chartTitle">
+    <div>
+      <h2 id="chartTitle">Mean waiting time</h2>
+      <p class="sub">Time from a ball's arrival until its bin starts processing it, in units of time, over the last 120 units. Vertical lines mark your changes.</p>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <span><span class="key key-1"></span>Since last reset</span>
+      <span><span class="key key-2"></span>Last 200 balls</span>
+      <span><span class="key key-t"></span>One choice, theory</span>
+    </div>
+    <div class="chart-plot" id="chart" tabindex="0" aria-label="Mean waiting time over the last 120 units of time. Use the left and right arrow keys to read values.">
+      <svg id="chartSvg" aria-hidden="true"></svg>
+      <div class="tooltip" id="tooltip" hidden></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="tableTitle">
+    <div>
+      <h2 id="tableTitle">Bins</h2>
+      <p class="sub">Mean wait is over the balls each bin has finished since the averages were last reset. Backlog is the time a bin needs to clear its queue, which is the wait a ball joining now would see.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Bin</th><th>Efficiency</th><th>Status</th><th class="num">In queue</th><th class="num">Backlog</th><th class="num">Finished</th><th class="num">Mean wait</th></tr>
+        </thead>
+        <tbody id="binRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section notes" aria-labelledby="notesTitle">
+    <h2 id="notesTitle">How the model works</h2>
+    <ul>
+      <li>Each ball's id, size and arrival time are hashed. With two choices the hash names two different bins, and the ball joins the one with less backlog. Ties go to the first bin checked.</li>
+      <li>A bin with efficiency <i>e</i> processes a ball of size <i>s</i> in <i>s</i>/<i>e</i> units of time, first come first served. Tube height measures work: a size-1 ball is one unit tall.</li>
+      <li>A ball's wait runs from its arrival until its processing starts, and counts toward the averages when the ball finishes.</li>
+      <li>A retired bin takes no new balls. It finishes its queue and is then removed. The last bin taking balls cannot be retired.</li>
+      <li>The theory line is the Pollaczek–Khinchine mean wait for one choice. Hashing splits a Poisson stream evenly, so each bin behaves as an M/G/1 queue with E[S²] = e<sup>σ²</sup>.</li>
+      <li>This page runs the same rules as <code>dynamic-sim/Simulator.hpp</code>, ported to JavaScript so it can run live.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+/* MODEL START: no DOM in here, so it can be tested on its own. */
+function createSim(o) {
+  const RECENT_N = 200, SAMPLE_DT = 0.5, WINDOW = 120;
+
+  // mulberry32: a small seeded generator for gaps and sizes
+  let seed = o.seed >>> 0;
+  function rand() {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  function normal() {
+    let u = 0;
+    while (u === 0) u = rand();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand());
+  }
+
+  // hash of (ball id, size, current time), as in Simulator::chooseBin
+  const f64 = new Float64Array(1), u32 = new Uint32Array(f64.buffer);
+  function fmix32(h) {
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b);
+    h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35);
+    h ^= h >>> 16;
+    return h >>> 0;
+  }
+  const combine = (h, x) => fmix32(h ^ fmix32(x));
+  const HASH_SEED = fmix32(o.seed ^ 0x5bd1e995);
+  function hashBall(id, size, time) {
+    let h = combine(HASH_SEED, id);
+    f64[0] = size; h = combine(h, u32[0]); h = combine(h, u32[1]);
+    f64[0] = time; h = combine(h, u32[0]); h = combine(h, u32[1]);
+    return h;
+  }
+  const kth = (h, k) => fmix32((h + Math.imul(k + 1, 0x9e3779b9)) | 0);
+
+  class Bin {
+    constructor(id, eff) {
+      this.id = id; this.eff = eff;
+      this.q = []; this.head = 0;
+      this.drain = 0;          // when the last ball in the queue finishes
+      this.retired = false; this.freed = false;
+      this.waitSum = 0; this.waitCount = 0;   // since the last reset
+      this.processed = 0;
+    }
+    get length() { return this.q.length - this.head; }
+    backlog(now) { return Math.max(0, this.drain - now); }
+    nextFinish() { return this.head < this.q.length ? this.q[this.head].finish : Infinity; }
+    meanWait() { return this.waitCount ? this.waitSum / this.waitCount : null; }
+    add(ball, now) {
+      ball.start = Math.max(now, this.drain);
+      ball.finish = ball.start + ball.size / this.eff;
+      this.drain = ball.finish;
+      this.q.push(ball);
+    }
+    pop() {
+      const ball = this.q[this.head++];
+      if (this.head >= 512 && this.head * 2 >= this.q.length) { this.q = this.q.slice(this.head); this.head = 0; }
+      return ball;
+    }
+  }
+
+  const sim = {
+    now: 0, lambda: o.lambda, poisson: o.poisson, sigma: o.sigma, D: o.D,
+    bins: [],                 // bins still running: taking balls, or retired and draining
+    nextBinId: 1, ballId: 0, nextArrival: 0, lastArrival: -Infinity,
+    cumSum: 0, cumCount: 0,
+    recent: new Float64Array(RECENT_N), recentLen: 0, recentPos: 0,
+    samples: [], markers: [], nextSampleT: SAMPLE_DT,
+    last: null, onPlace: null, onFree: null,
+    WINDOW, SAMPLE_DT, RECENT_N,
+  };
+
+  let activeCache = null, order = [];
+  function active() {
+    if (!activeCache) {
+      activeCache = sim.bins.filter(b => !b.retired);
+      order = activeCache.map((_, i) => i);
+    }
+    return activeCache;
+  }
+
+  const sampleSize = () => sim.sigma > 0 ? Math.exp(-0.5 * sim.sigma * sim.sigma + sim.sigma * normal()) : 1;
+  function reschedule() {
+    sim.nextArrival = sim.poisson
+      ? sim.now - Math.log(1 - rand()) / sim.lambda
+      : Math.max(sim.now, sim.lastArrival + 1 / sim.lambda);
+  }
+
+  function arrive() {
+    const now = sim.nextArrival;
+    sim.now = now;
+    sim.lastArrival = now;
+    const ball = { id: sim.ballId++, size: sampleSize(), arrival: now, start: 0, finish: 0 };
+    const act = active(), n = act.length;
+    if (n > 0) {
+      const d = Math.min(sim.D, n), h = hashBall(ball.id, ball.size, now);
+      const checked = [];
+      let best = null, bestLoad = Infinity;
+      for (let k = 0; k < d; k++) {
+        // partial Fisher-Yates step: d distinct bins, uniformly at random
+        const j = k + kth(h, k) % (n - k);
+        const t = order[k]; order[k] = order[j]; order[j] = t;
+        const bin = act[order[k]], load = bin.backlog(now);
+        checked.push({ bin, load });
+        if (load < bestLoad) { bestLoad = load; best = bin; }
+      }
+      best.add(ball, now);
+      sim.last = { ball, checked, chosen: best };
+      if (sim.onPlace) sim.onPlace(sim.last);
+    }
+    sim.nextArrival = now + (sim.poisson ? -Math.log(1 - rand()) / sim.lambda : 1 / sim.lambda);
+  }
+
+  function free(bin) {
+    bin.freed = true;
+    sim.bins.splice(sim.bins.indexOf(bin), 1);
+    if (sim.onFree) sim.onFree(bin);
+  }
+
+  function depart(bin) {
+    const ball = bin.pop();
+    sim.now = ball.finish;
+    const w = ball.start - ball.arrival;
+    bin.waitSum += w; bin.waitCount++; bin.processed++;
+    sim.cumSum += w; sim.cumCount++;
+    sim.recent[sim.recentPos] = w;
+    sim.recentPos = (sim.recentPos + 1) % RECENT_N;
+    if (sim.recentLen < RECENT_N) sim.recentLen++;
+    if (bin.retired && bin.length === 0) free(bin);
+  }
+
+  // At equal times bins finish balls before the source emits one.
+  function runUntil(T) {
+    for (let guard = 0; guard < 1e6; guard++) {
+      let next = null, tNext = Infinity;
+      for (const b of sim.bins) { const f = b.nextFinish(); if (f < tNext) { tNext = f; next = b; } }
+      if (next && tNext <= sim.nextArrival && tNext <= T) depart(next);
+      else if (sim.nextArrival <= T) arrive();
+      else break;
+    }
+    sim.now = T;
+  }
+
+  function theory() {
+    if (!sim.poisson) return { value: null, reason: 'needs exponential gaps' };
+    const act = active(), n = act.length;
+    if (!n) return { value: null, reason: 'no bins' };
+    const lam = sim.lambda / n, es2 = Math.exp(sim.sigma * sim.sigma);
+    let total = 0;
+    for (const b of act) {
+      const rho = lam / b.eff;
+      if (rho >= 1) return { value: null, reason: 'a bin would be over capacity' };
+      total += lam * es2 / (b.eff * b.eff) / (2 * (1 - rho));
+    }
+    return { value: total / n, reason: '' };
+  }
+
+  function recentMean() {
+    if (!sim.recentLen) return null;
+    let s = 0;
+    for (let i = 0; i < sim.recentLen; i++) s += sim.recent[i];
+    return s / sim.recentLen;
+  }
+
+  function record() {
+    const t = sim.nextSampleT;
+    sim.samples.push({ t, cum: sim.cumCount ? sim.cumSum / sim.cumCount : null, recent: recentMean(), theory: theory().value });
+    while (sim.samples.length && sim.samples[0].t < t - WINDOW) sim.samples.shift();
+    while (sim.markers.length && sim.markers[0].t < t - WINDOW) sim.markers.shift();
+  }
+
+  sim.advance = dt => {
+    const target = sim.now + dt;
+    while (sim.nextSampleT <= target) {
+      runUntil(sim.nextSampleT);
+      record();
+      sim.nextSampleT += SAMPLE_DT;
+    }
+    runUntil(target);
+  };
+  sim.setRate = v => { sim.lambda = v; reschedule(); };
+  sim.setPoisson = p => { sim.poisson = p; reschedule(); };
+  sim.setSigma = v => { sim.sigma = v; };
+  sim.setD = d => { sim.D = d; };
+  sim.addBin = eff => {
+    const b = new Bin(sim.nextBinId++, eff);
+    sim.bins.push(b);
+    activeCache = null;
+    return b;
+  };
+  sim.retireBin = b => {
+    if (b.retired) return;
+    b.retired = true;
+    activeCache = null;
+    if (b.length === 0) free(b);
+  };
+  sim.resetAverages = () => {
+    sim.cumSum = 0; sim.cumCount = 0; sim.recentLen = 0; sim.recentPos = 0;
+    for (const b of sim.bins) { b.waitSum = 0; b.waitCount = 0; }
+  };
+  sim.mark = label => sim.markers.push({ t: sim.now, label });
+  sim.active = active;
+  sim.theory = theory;
+  sim.recentMean = recentMean;
+  sim.capacity = () => active().reduce((s, b) => s + b.eff, 0);
+  sim.inSystem = () => sim.bins.reduce((s, b) => s + b.length, 0);
+  return sim;
+}
+/* MODEL END */
+
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const TUBE_UNITS = 16, MAX_BINS = 16, MIN_COL = 38, FADE_MS = 450;
+  const NOZZLE_Y = 46, TUBE_TOP = 112, FOOT = 86;
+
+  const motionMQ = matchMedia('(prefers-reduced-motion: reduce)');
+  let reduceMotion = motionMQ.matches;
+  motionMQ.addEventListener?.('change', e => { reduceMotion = e.matches; });
+
+  // Open in a working state: 60 units with one choice, then switch to two.
+  const sim = createSim({ seed: 3821, lambda: 7.2, poisson: true, sigma: 1, D: 1 });
+  for (let i = 0; i < 8; i++) sim.addBin(1);
+  sim.advance(60);
+  sim.setD(2);
+  sim.mark('2 choices');
+  sim.advance(60);
+
+  let paused = false, speed = 1, chartDirty = true;
+
+  // ---------- theme colours for the canvas ----------
+  const C = {};
+  function readTheme() {
+    const s = getComputedStyle(document.documentElement);
+    for (const k of ['ink', 'ink-2', 'muted', 'rule', 'rule-strong', 'glass', 'glass-fill', 'ball-serve', 'ball-wait', 'panel']) {
+      C[k] = s.getPropertyValue('--' + k).trim();
+    }
+    C.mono = s.getPropertyValue('--font-mono').trim();
+    C.body = s.getPropertyValue('--font-body').trim();
+    chartDirty = true;
+  }
+  readTheme();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', readTheme);
+  new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+  document.fonts?.ready.then(() => { chartDirty = true; });
+
+  // ---------- formatting ----------
+  function fmt(v) {
+    if (v == null || !isFinite(v)) return '–';
+    const a = Math.abs(v);
+    return a < 10 ? v.toFixed(2) : a < 100 ? v.toFixed(1) : String(Math.round(v));
+  }
+  const effLabel = e => e === 0.5 ? '½×' : e + '×';
+  const fmtIn = v => String(+v.toFixed(3));   // a setting, as typed: 7.2, 7.25, 10
+
+  // ---------- views of bins (a freed bin fades out before it leaves) ----------
+  const colsEl = $('cols');
+  const display = [];
+  const viewOf = new Map();
+  const xIcon = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+  function addView(bin, fadeIn) {
+    const col = document.createElement('div');
+    col.className = 'bincol';
+    const name = document.createElement('div');
+    name.className = 'bin-name';
+    const word = document.createElement('span');
+    word.className = 'word';
+    word.textContent = 'Bin ';
+    const eff = document.createElement('span');
+    eff.className = 'eff';
+    eff.textContent = effLabel(bin.eff);
+    name.append(word, String(bin.id), eff);
+    const wait = document.createElement('div');
+    wait.className = 'bin-wait';
+    wait.textContent = '–';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'bin-retire';
+    btn.innerHTML = xIcon + '<span class="word">Retire</span>';
+    btn.setAttribute('aria-label', 'Retire bin ' + bin.id);
+    btn.addEventListener('click', () => retire(bin));
+    const status = document.createElement('div');
+    status.className = 'bin-status';
+    status.textContent = 'draining';
+    status.hidden = true;
+    col.append(name, wait, btn, status);
+    colsEl.append(col);
+    const v = { bin, x: null, alpha: fadeIn && !reduceMotion ? 0 : 1, freedAt: 0, flash: -1e9, col, wait, btn, status, lastWait: '' };
+    display.push(v);
+    viewOf.set(bin, v);
+  }
+  for (const b of sim.bins) addView(b, false);
+
+  const dispatches = [];
+  sim.onPlace = p => {
+    const t = performance.now();
+    dispatches.push({ t, checked: p.checked.map(c => c.bin), chosen: p.chosen, size: p.ball.size });
+    if (dispatches.length > 24) dispatches.shift();
+    const v = viewOf.get(p.chosen);
+    if (v) v.flash = t;
+  };
+  sim.onFree = bin => {
+    const v = viewOf.get(bin);
+    if (v) { v.freedAt = performance.now(); v.status.textContent = 'freed'; }
+  };
+
+  function retire(bin) {
+    if (bin.retired || sim.active().length <= 1) return;
+    sim.retireBin(bin);
+    sim.mark('− bin ' + bin.id);
+    chartDirty = true;
+    updateText();
+  }
+
+  // ---------- controls ----------
+  const markLater = (() => {
+    let timer = 0;
+    return label => { clearTimeout(timer); timer = setTimeout(() => { sim.mark(label()); chartDirty = true; }, 600); };
+  })();
+
+  // A slider paired with a box to type the value into. The box accepts a wider
+  // range than the slider; past the slider's end its thumb rests at the end.
+  function pairSlider({ slider, box, hint, digits, get, apply, label }) {
+    const min = +box.min, max = +box.max;
+    const show = v => {
+      const s = v.toFixed(digits);
+      box.value = Math.abs(+s - v) < 1e-9 ? s : fmtIn(v);
+    };
+    const setValid = ok => { box.setAttribute('aria-invalid', String(!ok)); hint.hidden = ok; };
+    const set = v => { apply(v); updateText(); markLater(label); };
+    slider.addEventListener('input', () => {
+      setValid(true);
+      show(+slider.value);
+      set(+slider.value);
+    });
+    box.addEventListener('input', () => {
+      const v = box.valueAsNumber, ok = isFinite(v) && v >= min && v <= max;
+      setValid(ok);
+      if (ok && v !== get()) { slider.value = v; set(v); }
+    });
+    // Enter or leaving the box: clamp what was typed, or restore the value if it was cleared
+    const commit = () => {
+      const v = box.valueAsNumber;
+      const next = isFinite(v) ? Math.min(max, Math.max(min, v)) : get();
+      setValid(true);
+      slider.value = next;
+      show(next);
+      if (next !== get()) set(next);
+    };
+    box.addEventListener('change', commit);
+    box.addEventListener('blur', commit);
+    box.addEventListener('keydown', e => { if (e.key === 'Enter') { commit(); box.select(); } });
+  }
+  pairSlider({ slider: $('rate'), box: $('rateNum'), hint: $('rateHint'), digits: 1,
+    get: () => sim.lambda, apply: v => sim.setRate(v), label: () => 'λ ' + fmtIn(sim.lambda) });
+  pairSlider({ slider: $('sigma'), box: $('sigmaNum'), hint: $('sigmaHint'), digits: 2,
+    get: () => sim.sigma, apply: v => sim.setSigma(v), label: () => 'σ ' + fmtIn(sim.sigma) });
+  for (const r of document.querySelectorAll('input[name="choices"]')) {
+    r.addEventListener('change', () => {
+      sim.setD(+r.value);
+      sim.mark(r.value === '1' ? '1 choice' : '2 choices');
+      chartDirty = true;
+      updateText();
+    });
+  }
+  for (const r of document.querySelectorAll('input[name="arrivals"]')) {
+    r.addEventListener('change', () => {
+      sim.setPoisson(r.value === 'poisson');
+      sim.mark(sim.poisson ? 'exponential gaps' : 'constant gaps');
+      chartDirty = true;
+      updateText();
+    });
+  }
+  for (const r of document.querySelectorAll('input[name="speed"]')) {
+    r.addEventListener('change', () => { speed = +r.value; });
+  }
+  $('pause').addEventListener('click', () => {
+    paused = !paused;
+    $('pause').setAttribute('aria-pressed', String(paused));
+    $('pauseText').textContent = paused ? 'Resume' : 'Pause';
+    $('pauseIcon').innerHTML = paused
+      ? '<path d="M4 2.5v9l7-4.5z" fill="currentColor"/>'
+      : '<rect x="3" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="8" y="2" width="3" height="10" rx="1" fill="currentColor"/>';
+  });
+  $('reset').addEventListener('click', () => {
+    sim.resetAverages();
+    sim.mark('reset');
+    chartDirty = true;
+    updateText();
+    updateTable();
+  });
+  $('addBin').addEventListener('click', () => {
+    if (sim.bins.length >= MAX_BINS) return;
+    const eff = +document.querySelector('input[name="eff"]:checked').value;
+    const b = sim.addBin(eff);
+    addView(b, true);
+    sim.mark('+ bin ' + b.id);
+    chartDirty = true;
+    updateText();
+    updateTable();
+  });
+
+  // ---------- stage ----------
+  const scroller = $('stageScroll'), stage = $('stage'), cv = $('cv'), ctx = cv.getContext('2d');
+  let stageW = 0, stageH = 0, dpr = 1;
+  function sizeStage() {
+    const n = Math.max(display.length, 1);
+    const w = Math.max(scroller.clientWidth, 44 + n * MIN_COL);
+    if (Math.abs(w - stageW) > 0.5 || stage.clientHeight !== stageH || dpr !== (window.devicePixelRatio || 1)) {
+      stage.style.width = w + 'px';
+      stageW = w;
+      stageH = stage.clientHeight;
+      dpr = window.devicePixelRatio || 1;
+      cv.width = Math.round(stageW * dpr);
+      cv.height = Math.round(stageH * dpr);
+    }
+  }
+  new ResizeObserver(() => { sizeStage(); chartDirty = true; }).observe(scroller);
+
+  function layout() {
+    const n = Math.max(display.length, 1), left = 40, right = 10;
+    const usable = stageW - left - right;
+    const cw = Math.min(112, usable / n);
+    return { cw, start: left + (usable - cw * n) / 2, tw: Math.max(12, Math.min(46, cw * 0.46)) };
+  }
+
+  function bez(x0, y0, x1, y1, t) {
+    const k = (y1 - y0) * 0.55, u = 1 - t;
+    const ax = x0, ay = y0, bx = x0, by = y0 + k, cx = x1, cy = y1 - k, dx = x1, dy = y1;
+    return [
+      u * u * u * ax + 3 * u * u * t * bx + 3 * u * t * t * cx + t * t * t * dx,
+      u * u * u * ay + 3 * u * u * t * by + 3 * u * t * t * cy + t * t * t * dy,
+    ];
+  }
+  function pipe(x0, y0, x1, y1) {
+    const k = (y1 - y0) * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.bezierCurveTo(x0, y0 + k, x1, y1 - k, x1, y1);
+  }
+  function tubeOutline(x, tw, top, bottom) {
+    const l = x - tw / 2, r = x + tw / 2, rad = Math.min(8, tw / 2);
+    ctx.beginPath();
+    ctx.moveTo(l - 3, top);
+    ctx.lineTo(l, top + 4);
+    ctx.lineTo(l, bottom - rad);
+    ctx.arcTo(l, bottom, l + rad, bottom, rad);
+    ctx.lineTo(r - rad, bottom);
+    ctx.arcTo(r, bottom, r, bottom - rad, rad);
+    ctx.lineTo(r, top + 4);
+    ctx.lineTo(r + 3, top);
+  }
+  function tubeInterior(x, tw, top, bottom) {
+    const l = x - tw / 2, r = x + tw / 2, rad = Math.min(8, tw / 2);
+    ctx.beginPath();
+    ctx.moveTo(l, top + 4);
+    ctx.lineTo(l, bottom - rad);
+    ctx.arcTo(l, bottom, l + rad, bottom, rad);
+    ctx.lineTo(r - rad, bottom);
+    ctx.arcTo(r, bottom, r, bottom - rad, rad);
+    ctx.lineTo(r, top + 4);
+    ctx.closePath();
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    if (r > 0 && ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+    else ctx.rect(x, y, w, h);
+    ctx.fill();
+  }
+
+  let lastMode = '';
+  function updateViews(ts, dt) {
+    const L = layout();
+    const mode = L.cw >= 78 ? 'full' : 'compact';
+    if (mode !== lastMode) { colsEl.dataset.mode = mode; lastMode = mode; }
+    const colW = Math.max(MIN_COL - 2, Math.min(L.cw - 4, 108));
+    for (let i = display.length - 1; i >= 0; i--) {
+      const v = display[i];
+      if (v.freedAt && (reduceMotion || ts - v.freedAt > FADE_MS)) {
+        v.col.remove();
+        display.splice(i, 1);
+        viewOf.delete(v.bin);
+      }
+    }
+    display.forEach((v, i) => {
+      const tx = L.start + L.cw * (i + 0.5);
+      v.x = v.x == null || reduceMotion ? tx : v.x + (tx - v.x) * Math.min(1, dt * 9);
+      if (v.freedAt) v.alpha = Math.max(0, 1 - (ts - v.freedAt) / FADE_MS);
+      else if (v.alpha < 1) v.alpha = reduceMotion ? 1 : Math.min(1, v.alpha + dt * 4);
+      v.col.style.width = colW + 'px';
+      v.col.style.transform = 'translateX(' + (v.x - colW / 2).toFixed(1) + 'px)';
+      v.col.style.opacity = v.alpha.toFixed(3);
+    });
+    return L;
+  }
+
+  function drawStage(ts, L) {
+    const W = stageW, H = stageH;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const top = TUBE_TOP, bottom = H - FOOT - 6, ppu = (bottom - 2.5 - (top + 8)) / TUBE_UNITS;
+    const base = bottom - 2.5;
+    const cx = W / 2;
+
+    // scale: work units, with hairline guides behind the tubes
+    ctx.font = '10px ' + C.mono;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let u = 0; u <= TUBE_UNITS; u += 4) {
+      const y = Math.round(base - u * ppu) + 0.5;
+      ctx.fillStyle = C.muted;
+      ctx.fillText(String(u), 30, y);
+      if (u > 0) {
+        ctx.strokeStyle = C.rule;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(36, y);
+        ctx.lineTo(W - 8, y);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = C.muted;
+    ctx.fillText('work', 30, top - 6);
+
+    // source hopper
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = C.glass;
+    ctx.fillStyle = C['glass-fill'];
+    ctx.beginPath();
+    ctx.moveTo(cx - 22, 12); ctx.lineTo(cx + 22, 12); ctx.lineTo(cx + 6, 36); ctx.lineTo(cx + 3, 36);
+    ctx.lineTo(cx + 3, NOZZLE_Y); ctx.lineTo(cx - 3, NOZZLE_Y); ctx.lineTo(cx - 3, 36); ctx.lineTo(cx - 6, 36);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.font = '600 12px ' + C.body;
+    ctx.fillStyle = C.ink;
+    ctx.fillText('Source', cx + 32, 22);
+    ctx.font = '11px ' + C.mono;
+    ctx.fillStyle = C['ink-2'];
+    ctx.fillText('λ ' + fmtIn(sim.lambda) + ' / unit time', cx + 32, 37);
+    ctx.textAlign = 'right';
+    ctx.font = '600 12px ' + C.body;
+    ctx.fillStyle = C.ink;
+    ctx.fillText(sim.D === 1 ? '1 choice' : '2 choices', cx - 32, 22);
+    ctx.font = '11px ' + C.mono;
+    ctx.fillStyle = C['ink-2'];
+    ctx.fillText(sim.D === 1 ? 'hash picks the bin' : 'less backlog wins', cx - 32, 37);
+
+    // pipes to every bin still taking balls
+    ctx.strokeStyle = C['rule-strong'];
+    ctx.lineWidth = 1.25;
+    for (const v of display) {
+      if (v.bin.retired) continue;
+      ctx.globalAlpha = v.alpha;
+      pipe(cx, NOZZLE_Y, v.x, top - 1);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // recent placements: dashed for the bin checked and passed over, solid for the bin chosen
+    const now = performance.now();
+    while (dispatches.length && now - dispatches[0].t > 600) dispatches.shift();
+    for (const d of dispatches) {
+      const age = now - d.t, a = Math.max(0, 1 - age / 600);
+      const vc = viewOf.get(d.chosen);
+      for (const b of d.checked) {
+        if (b === d.chosen) continue;
+        const vb = viewOf.get(b);
+        if (!vb) continue;
+        ctx.globalAlpha = a * 0.9;
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = C.muted;
+        ctx.lineWidth = 1.25;
+        pipe(cx, NOZZLE_Y, vb.x, top - 1);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (!vc) continue;
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = C['ball-serve'];
+      ctx.lineWidth = 2;
+      pipe(cx, NOZZLE_Y, vc.x, top - 1);
+      ctx.stroke();
+      if (!reduceMotion && age < 300) {
+        const p = 1 - Math.pow(1 - age / 300, 2);
+        const [px, py] = bez(cx, NOZZLE_Y, vc.x, top - 1, p);
+        const ph = Math.max(3, Math.min(16, d.size * ppu * 0.6)), pw = Math.min(10, L.tw * 0.6);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = C['ball-serve'];
+        roundRect(px - pw / 2, py - ph / 2, pw, ph, 1.5);
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // tubes
+    const tw = L.tw;
+    for (const v of display) {
+      const bin = v.bin, x = v.x;
+      ctx.globalAlpha = v.alpha;
+      tubeInterior(x, tw, top, bottom);
+      ctx.fillStyle = C['glass-fill'];
+      ctx.fill();
+
+      // balls, bottom up; the one being processed shrinks as work is done
+      ctx.save();
+      tubeInterior(x, tw, top, bottom);
+      ctx.clip();
+      const innerL = x - tw / 2 + 2.5, innerW = tw - 5, cap = top + 8;
+      let y = base, drawn = 0, overflow = 0;
+      for (let i = bin.head; i < bin.q.length; i++) {
+        const ball = bin.q[i];
+        const units = i === bin.head ? Math.max(0, Math.min(ball.size, (ball.finish - sim.now) * bin.eff)) : ball.size;
+        const h = units * ppu, yTop = y - h;
+        const gap = h >= 6 ? 2 : h >= 3 ? 1 : 0;
+        ctx.fillStyle = i === bin.head ? C['ball-serve'] : C['ball-wait'];
+        roundRect(innerL, yTop + gap, innerW, Math.max(0.75, h - gap), h >= 8 ? 2 : 0);
+        y = yTop;
+        drawn++;
+        if (y <= cap) { overflow = bin.length - drawn; break; }
+      }
+      ctx.restore();
+
+      // glass, graduations, rim
+      ctx.globalAlpha = v.alpha;
+      ctx.strokeStyle = C.glass;
+      ctx.lineWidth = 1.5;
+      if (bin.retired) ctx.setLineDash([4, 3]);
+      tubeOutline(x, tw, top, bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let u = 1; u <= TUBE_UNITS; u++) {
+        const gy = Math.round(base - u * ppu) + 0.5, len = u % 4 === 0 ? 6 : 3;
+        ctx.moveTo(x - tw / 2, gy);
+        ctx.lineTo(x - tw / 2 + len, gy);
+      }
+      ctx.stroke();
+      const fl = (now - v.flash) / 350;
+      if (fl >= 0 && fl < 1) {
+        ctx.globalAlpha = v.alpha * (1 - fl);
+        ctx.strokeStyle = C['ball-serve'];
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x - tw / 2 - 3, top);
+        ctx.lineTo(x + tw / 2 + 3, top);
+        ctx.stroke();
+      }
+      if (overflow > 0) {
+        ctx.globalAlpha = v.alpha;
+        const label = '+' + overflow;
+        ctx.font = '500 10px ' + C.mono;
+        const w = ctx.measureText(label).width + 8;
+        ctx.fillStyle = C.panel;
+        roundRect(x - w / 2, top + 9, w, 15, 7.5);
+        ctx.strokeStyle = C['rule-strong'];
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = C.ink;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, x, top + 16.5);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- text readouts ----------
+  function updateText() {
+    const act = sim.active().length, draining = sim.bins.length - act;
+    const cap = sim.capacity(), load = cap ? sim.lambda / cap : Infinity;
+    const pct = isFinite(load) ? Math.round(load * 100) + '%' : '–';
+    $('loadFoot').innerHTML = '';
+    $('loadFoot').append('Load ', Object.assign(document.createElement('strong'), { textContent: pct }), ' of capacity');
+    $('vLoad').textContent = pct;
+    $('sLoad').textContent = 'λ ' + fmtIn(sim.lambda) + ' ÷ capacity ' + (Math.round(cap * 10) / 10);
+    $('warnLoad').hidden = !(load >= 1);
+
+    $('vCum').textContent = fmt(sim.cumCount ? sim.cumSum / sim.cumCount : null);
+    $('sCum').textContent = 'over ' + sim.cumCount.toLocaleString() + ' balls since reset';
+    $('vRecent').textContent = fmt(sim.recentMean());
+    const th = sim.theory();
+    $('vTheory').textContent = th.value == null ? 'n/a' : fmt(th.value);
+    $('sTheory').textContent = th.value == null ? 'Not defined: ' + th.reason : 'M/G/1 mean wait per bin';
+    const inSys = sim.inSystem();
+    $('vSys').textContent = inSys.toLocaleString();
+    $('sSys').textContent = 'balls queued or in progress';
+
+    const st = $('benchStatus');
+    st.textContent = '';
+    st.append(Object.assign(document.createElement('strong'), { textContent: String(act) }),
+      act === 1 ? ' bin taking balls' : ' bins taking balls');
+    if (draining) st.append(' · ' + draining + ' draining');
+    $('addBin').disabled = sim.bins.length >= MAX_BINS;
+    $('addBin').title = sim.bins.length >= MAX_BINS ? 'At most ' + MAX_BINS + ' bins' : '';
+
+    for (const v of display) {
+      const w = fmt(v.bin.meanWait());
+      if (w !== v.lastWait) { v.wait.textContent = w; v.lastWait = w; }
+      v.btn.hidden = v.bin.retired;
+      v.status.hidden = !v.bin.retired;
+      const last = !v.bin.retired && act <= 1;
+      v.btn.disabled = last;
+      v.btn.title = last ? 'Keep at least one bin taking balls' : '';
+    }
+
+    const p = sim.last, pt = $('placementText');
+    if (p) {
+      const id = p.ball.id.toLocaleString(), size = p.ball.size.toFixed(2);
+      const part = c => 'bin ' + c.bin.id + ' (backlog ' + fmt(c.load) + ')';
+      pt.textContent = p.checked.length === 1
+        ? 'Ball ' + id + ', size ' + size + ', hashed to ' + part(p.checked[0]) + ' and joined it.'
+        : 'Ball ' + id + ', size ' + size + ', checked ' + p.checked.map(part).join(' and ') + ', joined bin ' + p.chosen.id + '.';
+    }
+  }
+
+  function updateTable() {
+    const rows = sim.bins.map(b => {
+      const tr = document.createElement('tr');
+      const cell = (text, cls) => { const td = document.createElement('td'); if (cls) td.className = cls; td.textContent = text; return td; };
+      const status = document.createElement('td');
+      const pill = document.createElement('span');
+      pill.className = b.retired ? 'pill pill-drain' : 'pill';
+      pill.textContent = b.retired ? 'Draining' : 'Taking balls';
+      status.append(pill);
+      tr.append(
+        cell('Bin ' + b.id),
+        cell(effLabel(b.eff)),
+        status,
+        cell(b.length.toLocaleString(), 'num'),
+        cell(fmt(b.backlog(sim.now)), 'num'),
+        cell(b.processed.toLocaleString(), 'num'),
+        cell(fmt(b.meanWait()), 'num'),
+      );
+      return tr;
+    });
+    $('binRows').replaceChildren(...rows);
+  }
+
+  // ---------- chart ----------
+  const chartEl = $('chart'), svg = $('chartSvg'), tip = $('tooltip');
+  const NS = 'http://www.w3.org/2000/svg';
+  const SERIES = [
+    { key: 'cum', cls: 'c-cum', dot: 'c-dot-1', label: 'Since last reset', keyCls: 'key-1' },
+    { key: 'recent', cls: 'c-recent', dot: 'c-dot-2', label: 'Last 200 balls', keyCls: 'key-2' },
+    { key: 'theory', cls: 'c-theory', dot: 'c-dot-t', label: 'One choice, theory', keyCls: 'key-t' },
+  ];
+  let geo = null, hoverPx = null, hoverG = null;
+  function el(tag, attrs, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function niceStep(span, count) {
+    const raw = span / count, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+    return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+  }
+
+  function drawChart() {
+    const S = sim.samples;
+    const W = chartEl.clientWidth, H = chartEl.clientHeight;
+    if (!S.length || W < 50) return;
+    const m = { l: 40, r: 52, t: 24, b: 24 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const tEnd = S[S.length - 1].t, tStart = tEnd - sim.WINDOW;
+    let maxV = 0.5;
+    for (const s of S) for (const se of SERIES) if (s[se.key] != null) maxV = Math.max(maxV, s[se.key]);
+    const step = niceStep(maxV * 1.08, 4), yMax = Math.ceil(maxV * 1.08 / step) * step;
+    const X = t => m.l + (t - tStart) / sim.WINDOW * pw;
+    const Y = v => m.t + ph - v / yMax * ph;
+    geo = { m, pw, ph, X, Y, tStart, tEnd, S };
+
+    const kids = [];
+    for (let v = 0; v <= yMax + 1e-9; v += step) {
+      const y = Math.round(Y(v)) + 0.5;
+      kids.push(el('line', { x1: m.l, x2: m.l + pw, y1: y, y2: y, class: v === 0 ? 'c-base' : 'c-grid' }));
+      kids.push(el('text', { x: m.l - 6, y: y + 3.5, 'text-anchor': 'end', class: 'c-tick' }, fmtTick(v, step)));
+    }
+    for (let t = Math.ceil(tStart / 20) * 20; t <= tEnd; t += 20) {
+      if (t < 0) continue;
+      kids.push(el('text', { x: X(t), y: m.t + ph + 16, 'text-anchor': 'middle', class: 'c-tick' }, 't ' + t));
+    }
+    let labelRight = -Infinity;
+    for (const mk of sim.markers) {
+      if (mk.t < tStart) continue;
+      const x = Math.round(X(mk.t)) + 0.5;
+      kids.push(el('line', { x1: x, x2: x, y1: m.t - 4, y2: m.t + ph, class: 'c-mark' }));
+      const w = mk.label.length * 6.2;
+      let lx = x + 4, anchor = 'start';
+      if (lx + w > W - 2) { lx = x - 4; anchor = 'end'; }
+      const left = anchor === 'start' ? lx : lx - w;
+      if (left > labelRight + 6) {
+        kids.push(el('text', { x: lx, y: m.t - 8, 'text-anchor': anchor, class: 'c-mark-label' }, mk.label));
+        labelRight = left + w;
+      }
+    }
+    for (const se of [...SERIES].reverse()) {
+      let d = '', pen = false;
+      for (const s of S) {
+        const v = s[se.key];
+        if (v == null) { pen = false; continue; }
+        d += (pen ? 'L' : 'M') + X(s.t).toFixed(1) + ' ' + Y(v).toFixed(1);
+        pen = true;
+      }
+      if (d) kids.push(el('path', { d, class: 'c-line ' + se.cls }));
+    }
+    // end dots, with values in the right margin where they don't collide
+    const last = S[S.length - 1], ends = [];
+    for (const se of SERIES) {
+      const v = last[se.key];
+      if (v == null) continue;
+      kids.push(el('circle', { cx: X(last.t), cy: Y(v), r: 4, class: 'c-dot ' + se.dot }));
+      ends.push({ y: Y(v), v });
+    }
+    ends.sort((a, b) => a.y - b.y);
+    let prevY = -Infinity;
+    for (const e of ends) {
+      if (e.y - prevY < 13) continue;
+      kids.push(el('text', { x: X(last.t) + 9, y: e.y + 3.5, class: 'c-end' }, fmt(e.v)));
+      prevY = e.y;
+    }
+    hoverG = el('g', {});
+    kids.push(hoverG);
+    svg.replaceChildren(...kids);
+    drawHover();
+  }
+  function fmtTick(v, step) {
+    return step < 0.1 ? v.toFixed(2) : step < 1 ? v.toFixed(1) : String(Math.round(v));
+  }
+
+  function drawHover() {
+    if (!geo || !hoverG) return;
+    hoverG.replaceChildren();
+    if (hoverPx == null) { tip.hidden = true; return; }
+    const { m, pw, ph, X, Y, tStart, S } = geo;
+    const t = tStart + (Math.min(Math.max(hoverPx, m.l), m.l + pw) - m.l) / pw * sim.WINDOW;
+    let best = S[0];
+    for (const s of S) if (Math.abs(s.t - t) < Math.abs(best.t - t)) best = s;
+    const x = Math.round(X(best.t)) + 0.5;
+    hoverG.append(el('line', { x1: x, x2: x, y1: m.t, y2: m.t + ph, class: 'c-cross' }));
+    for (const se of SERIES) {
+      const v = best[se.key];
+      if (v != null) hoverG.append(el('circle', { cx: X(best.t), cy: Y(v), r: 4, class: 'c-dot ' + se.dot }));
+    }
+    tip.replaceChildren();
+    const head = document.createElement('div');
+    head.className = 'tt-time';
+    head.textContent = 't = ' + best.t.toFixed(1);
+    tip.append(head);
+    for (const se of SERIES) {
+      const row = document.createElement('div');
+      row.className = 'tt-row';
+      const key = document.createElement('span');
+      key.className = 'key ' + se.keyCls;
+      const val = document.createElement('strong');
+      val.textContent = best[se.key] == null ? 'n/a' : fmt(best[se.key]);
+      const lab = document.createElement('span');
+      lab.textContent = se.label;
+      row.append(key, val, lab);
+      tip.append(row);
+    }
+    for (const mk of sim.markers) {
+      if (Math.abs(mk.t - best.t) <= sim.SAMPLE_DT / 2 + 1e-9 || (mk.t <= best.t && mk.t > best.t - sim.SAMPLE_DT)) {
+        const ev = document.createElement('div');
+        ev.className = 'tt-ev';
+        ev.textContent = mk.label;
+        tip.append(ev);
+      }
+    }
+    tip.hidden = false;
+    const tw = tip.offsetWidth;
+    const left = x + 12 + tw > chartEl.clientWidth ? x - 12 - tw : x + 12;
+    tip.style.left = Math.max(0, left) + 'px';
+  }
+
+  chartEl.addEventListener('pointermove', e => {
+    const r = chartEl.getBoundingClientRect();
+    hoverPx = e.clientX - r.left;
+    drawHover();
+  });
+  chartEl.addEventListener('pointerleave', () => { hoverPx = null; drawHover(); });
+  chartEl.addEventListener('keydown', e => {
+    if (!geo) return;
+    const stepPx = geo.pw / (sim.WINDOW / sim.SAMPLE_DT);
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      if (hoverPx == null) hoverPx = geo.m.l + geo.pw;
+      hoverPx += (e.key === 'ArrowLeft' ? -1 : 1) * stepPx * (e.shiftKey ? 10 : 1);
+      hoverPx = Math.min(Math.max(hoverPx, geo.m.l), geo.m.l + geo.pw);
+      e.preventDefault();
+    } else if (e.key === 'Home') { hoverPx = geo.m.l; e.preventDefault(); }
+    else if (e.key === 'End') { hoverPx = geo.m.l + geo.pw; e.preventDefault(); }
+    else if (e.key === 'Escape') { hoverPx = null; }
+    else return;
+    drawHover();
+  });
+  chartEl.addEventListener('blur', () => { hoverPx = null; drawHover(); });
+  new ResizeObserver(() => { chartDirty = true; }).observe(chartEl);
+
+  // ---------- main loop ----------
+  let lastTs = performance.now(), lastText = -1e9, lastTable = -1e9, chartKey = -1;
+  sizeStage();
+  updateText();
+  updateTable();
+  function frame(ts) {
+    const dt = Math.min(0.1, Math.max(0, (ts - lastTs) / 1000));
+    lastTs = ts;
+    if (!paused) sim.advance(dt * speed);
+    sizeStage();
+    const L = updateViews(ts, dt);
+    drawStage(ts, L);
+    if (ts - lastText > 150) { updateText(); lastText = ts; }
+    if (ts - lastTable > 500) { updateTable(); lastTable = ts; }
+    const key = sim.samples.length ? sim.samples[sim.samples.length - 1].t : 0;
+    if (key !== chartKey || chartDirty) { drawChart(); chartKey = key; chartDirty = false; }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
