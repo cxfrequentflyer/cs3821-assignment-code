@@ -21,6 +21,7 @@ private:
     unique_ptr<Distribution> sizeDist;
     double nextBallTime = 0.0;
     uint64_t emitted = 0;
+    double constantGap = 0.0;   // the gap, when gaps are constant
 
 public:
 
@@ -41,6 +42,7 @@ public:
             this->timeDist = make_unique<ExponentialDistribution>(1.0 / meanGap, hashCombine(seed, 1));
         } else {
             this->timeDist = make_unique<ConstantDistribution>(meanGap);
+            this->constantGap = meanGap;
         }
         if (sigma > 0.0) {
             this->sizeDist = make_unique<LognormalDistribution>(-0.5 * sigma * sigma, sigma, hashCombine(seed, 2));
@@ -61,7 +63,10 @@ public:
 
 inline optional<Ball> Source::processEvent(double now) {
     Ball ball(this->emitted++, this->sizeDist->sample(), now);
-    this->nextBallTime = now + this->timeDist->sample();
+    // With constant gaps ball k arrives at exactly k * gap; adding up the gaps
+    // instead would let rounding build up over millions of balls.
+    this->nextBallTime = this->constantGap > 0.0 ? static_cast<double>(this->emitted) * this->constantGap
+                                                 : now + this->timeDist->sample();
     return ball;
 }
 

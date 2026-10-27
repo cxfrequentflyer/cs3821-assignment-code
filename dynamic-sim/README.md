@@ -43,6 +43,7 @@ sim.averageQueueingDelay();     // also ballsProcessed(), ballsInSystem(), total
 | `EventEntity.hpp` | the task interface shared by the source and bins |
 | `Ball.hpp`, `Distribution.hpp`, `Hash.hpp` | data, seeded random streams, a 64-bit mixer |
 | `tests.cpp` | checks against hand-computed runs and Pollaczek-Khinchine |
+| `transition-matrix/` | idle-bin transition matrix tables for 1 vs 2 choices, for any bins, load and balls per transition |
 | `visualiser/index.html` | live browser view: add/retire bins, change the rate, toggle 1 or 2 choices |
 | `original/` | the incomplete version this was built from |
 
