@@ -39,7 +39,8 @@ public:
 
     optional<Ball> processEvent(double now) override;
 
-    void addBall(Ball ball, double now);
+    // Queue the ball; returns it as stored, with its start and finish times set.
+    const Ball &addBall(Ball ball, double now);
 
     // A retired bin takes no new balls but finishes the ones it holds.
     void retire() { this->isRetired = true; }
@@ -75,7 +76,7 @@ inline double Bin::nextActionTime() const {
     return this->balls.front().finishTime;
 }
 
-inline void Bin::addBall(Ball ball, double now) {
+inline const Ball &Bin::addBall(Ball ball, double now) {
     if (this->isRetired) {
         throw logic_error("A retired bin cannot take new balls");
     }
@@ -83,6 +84,7 @@ inline void Bin::addBall(Ball ball, double now) {
     ball.finishTime = ball.startTime + ball.size / this->efficiency;
     this->drainTime = ball.finishTime;
     this->balls.push(ball);
+    return this->balls.back();
 }
 
 inline optional<Ball> Bin::processEvent(double now) {

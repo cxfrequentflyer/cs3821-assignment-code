@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <numeric>
 #include <queue>
@@ -78,6 +79,10 @@ public:
     //                  hashes and may repeat.
     Simulator(shared_ptr<Source> source, int Dchoice, uint64_t seed = 0,
               LoadMetric metric = LoadMetric::Backlog, bool distinctChoices = true);
+
+    // Called after every ball is placed, with the bin it joined and the ball as
+    // stored there (its start time gives its wait). Optional.
+    function<void(const Bin &, const Ball &)> onPlace;
 
     // Add a bin at the current time. Returns its id.
     int addBin(double efficiency = 1.0);
@@ -185,9 +190,12 @@ inline void Simulator::place(const Ball &ball) {
     }
     shared_ptr<Bin> &bin = this->bins[this->chooseBin(ball)];
     bool wasIdle = bin->idle();
-    bin->addBall(ball, this->time);
+    const Ball &placed = bin->addBall(ball, this->time);
     if (wasIdle) {
         this->schedule(bin);            // its next task: this ball finishing
+    }
+    if (this->onPlace) {
+        this->onPlace(*bin, placed);
     }
 }
 
