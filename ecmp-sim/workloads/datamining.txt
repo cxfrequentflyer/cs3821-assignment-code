@@ -1,0 +1,18 @@
+# Data mining flow-size CDF (Greenberg et al., VL2, SIGCOMM 2009), as used by
+# pFabric (SIGCOMM 2013, Fig. 4b) and CONGA (SIGCOMM 2014).
+# Columns: size in 1460-byte packets, cumulative probability. Linear between
+# points. This is the transcription that circulates with the pFabric/CONGA
+# simulation code; it matches pFabric §5's summary ("more than 80% of the
+# flows are less than 10KB and 95% of all bytes are in the ~3.6% flows that
+# are larger than 35MB"), which tests/test_workloads.py checks. Verify
+# against the original figure before quoting exact numbers.
+# size_pkts  cdf
+1       0
+1       0.5
+2       0.6
+3       0.7
+7       0.8
+267     0.9
+2107    0.95
+66667   0.99
+666667  1
