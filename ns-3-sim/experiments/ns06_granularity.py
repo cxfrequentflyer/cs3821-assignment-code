@@ -15,9 +15,7 @@ is made, are the bottleneck.
 
 Writes results/ns06_granularity.png: FCT against reordering, one point per scheme.
 """
-import sys
-
-from common import HERE, REPO, WEBSEARCH, parser, run_grid, show
+from common import HERE, WEBSEARCH, parser, run_grid, show
 
 LADDER = ([("ecmp (flow)", {"scheme": "ecmp"})]
           + [(f"flowlet {g}us", {"scheme": "flowlet", "flowletGap": g}) for g in (500, 100, 20)]
@@ -48,7 +46,6 @@ def main():
 
 
 def plot(g):
-    sys.path.insert(0, str(REPO / "ecmp-sim" / "experiments"))
     import plotstyle as ps
     plt = ps.setup()
     fig, ax = plt.subplots(figsize=(7.5, 4.8), facecolor=ps.SURFACE)
