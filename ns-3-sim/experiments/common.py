@@ -3,8 +3,9 @@ configurations in parallel, cache the results, and summarize them.
 
 Every experiment script builds a list of configurations (dicts of lb-fabric
 command-line options), calls `run_grid`, and gets back one DataFrame row per
-(configuration, seed). Results are cached in results/<name>.csv: rerunning a
-script only simulates configurations that are missing, unless --rerun.
+(configuration, seed). Results are cached in results/<name>.csv, one row
+appended per finished run: rerunning a script (also after an interruption)
+only simulates configurations that are missing, unless --rerun.
 
 Finding the simulator: set NS3_DIR to your ns-3.49 directory (the one with the
 `ns3` script, whose `scratch` is a link to this repo's ns-3-sim), build it
@@ -90,11 +91,16 @@ def run_grid(name: str, configs: list[dict], args) -> pd.DataFrame:
                 todo.append(full)
     print(f"{name}: {len(todo)} runs to simulate, {len(keep)} cached ({binary.name}, "
           f"{args.jobs} at a time)", flush=True)
+    if args.rerun and csv.exists():
+        csv.unlink()
     new = []
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {pool.submit(_run_one, binary, cfg): cfg for cfg in todo}
         for i, fut in enumerate(as_completed(futures), 1):
-            new.append(fut.result())
+            row = fut.result()
+            new.append(row)
+            # append as we go, so an interrupted sweep resumes where it stopped
+            row.to_csv(csv, mode="a", header=not csv.exists(), index=False)
             if i % max(1, len(todo) // 10) == 0 or i == len(todo):
                 print(f"  {i}/{len(todo)} done", flush=True)
     frames = [f for f in [cached, *new] if len(f)]

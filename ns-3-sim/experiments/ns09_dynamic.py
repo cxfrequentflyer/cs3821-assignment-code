@@ -7,7 +7,8 @@ traffic leaf 0 -> leaf 1, log-normal sizes with sigma = 1 as dynamic-sim's
 default):
 
     steady         8 equal uplinks
-    hetero         2 of the 8 uplinks run 2x faster (dynamic-sim's `eff 6x1,2x2`)
+    hetero         the same total capacity spread unevenly: link speeds 2, 2,
+                   0.5 x 4, 1, 1 (dynamic-sim's `eff`), on both hops
     retire 2       two uplinks leave service halfway through (they drain first)
     add 2          two extra uplinks join halfway through
 
@@ -28,7 +29,10 @@ SCHEMES = [{"scheme": "ecmp"}, {"scheme": "dchoice", "d": 2},
 
 def scenarios(event_us):
     half = f"@{event_us:.0f}"
-    return {"steady": {}, "hetero": {"slow": "0-6:2,0-7:2"},
+    # same total capacity, unequal links (both hops): 2, 2, 0.5 x 4, 1, 1
+    hetero = ",".join(f"{l}-{s}:{x}" for l in (0, 1)
+                      for s, x in enumerate([2, 2, 0.5, 0.5, 0.5, 0.5, 1, 1]))
+    return {"steady": {}, "hetero": {"slow": hetero},
             "retire 2": {"retire": f"0-6{half},0-7{half}"},
             "add 2": {"spines": N + 2, "add": f"0-{N}{half},0-{N + 1}{half}"}}
 

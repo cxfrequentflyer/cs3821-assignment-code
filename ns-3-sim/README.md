@@ -141,27 +141,9 @@ end doesn't dilute them.
 - **Not modeled:** host-side flowcell splitting and reorder buffers (Presto's
   shim), incast applications, multi-tier Clos.
 
-## First observations (quick runs: few flows, one seed)
+## Results
 
-These come from `--quick --seeds 1` smoke runs, so they're for orientation,
-not for quoting. Rerun the full settings before using any number.
-
-- **ns06 (granularity):** the trade-off is clear.
-  - ECMP reorders almost nothing (~2% of flows) but drops heavily at the
-    uplinks and has the slowest flows.
-  - Flowlets and CONGA stay below 5% reordered and are faster.
-  - 64KB flowcells remove uplink drops at ~45% of flows reordered.
-  - Per-packet schemes are fastest with 85-95% reordered.
-  - DRILL reorders only slightly less than per-packet random here, unlike the
-    paper's 8x. Possible reasons: queues are measured differently, the core
-    runs at the host rate (10G) where DRILL's ran at 4x (40G), and there is no shim.
-- **ns08 (asymmetry):** with a quarter-speed link, plain per-packet DRILL's
-  mean FCT roughly quadruples, while DRILL with symmetric components and
-  CONGA stay close to the symmetric case. This is DRILL §3.4's point.
-- **ns07 (workloads):** data mining has lower normalized FCTs than web search
-  at the same load: pFabric's "easier" result.
-- **ns05 (unequal speeds):** at 80% load, one memory slot cuts DRILL(1,0)'s
-  mean FCT about in half.
-- **ns04 (herding):** staleness hurts monotonically; the engine-count effect
-  is small next to seed-to-seed noise at quick settings, so run it with
-  several seeds.
+[RESULTS.md](RESULTS.md) summarizes the full sweeps (2 seeds each): what each
+experiment shows, the paper results it reproduces, and where it disagrees.
+For example, DRILL reorders far more here than in its paper, and "data
+mining is easier" does not hold for per-packet DRILL.

@@ -26,7 +26,7 @@
  * another leaf), stride:<k> (destination leaf = source leaf + k), or
  * pair:<a>:<b> (leaf a's hosts to leaf b's: a single ECMP group, as in ecmp-sim
  * level 1). The arrival rate makes the offered load `load` x the uplink
- * capacity of the sending leaves.
+ * capacity of the sending leaves (the links in service at the start).
  *
  * Output: one row appended to --out (CSV, header written if the file is new),
  * and optionally one row per flow to --flowsOut.
@@ -824,7 +824,10 @@ main(int argc, char* argv[])
     {
         for (uint32_t s = 0; s < spines; s++)
         {
-            capacity += g_fabric.upRate[l][s];
+            if (g_fabric.InService(l, s)) // links added later do not count
+            {
+                capacity += g_fabric.upRate[l][s];
+            }
         }
     }
     double lambda = load * capacity / (8 * dist.mean); // flows per second
