@@ -8,11 +8,15 @@ What a weight *means* is a modeling choice to state in the report. In a
 snapshot of the network it is a flow's rate demand (what it would send with a
 link to itself). Over a time window it is the number of bytes the flow sends.
 
-Every class has a `label` (used in result tables and for seeding) and a
-`sample(rng, size)` method returning an array of positive weights.
+Every class has a `label` (used in result tables and for seeding), a
+`sample(rng, size)` method returning an array of positive weights, and a
+`cv2` property: the squared coefficient of variation Var(S) / E[S]^2, which is
+what CONGA's imbalance theorem depends on (theory.conga_imbalance_bound). It
+is math.inf when the variance is infinite.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +31,10 @@ class Unit:
     def label(self) -> str:
         return "unit"
 
+    @property
+    def cv2(self) -> float:
+        return 0.0
+
     def sample(self, rng: np.random.Generator, size) -> np.ndarray:
         return np.ones(size)
 
@@ -38,6 +46,10 @@ class Exponential:
     @property
     def label(self) -> str:
         return "exp"
+
+    @property
+    def cv2(self) -> float:
+        return 1.0
 
     def sample(self, rng: np.random.Generator, size) -> np.ndarray:
         return rng.exponential(1.0, size)
@@ -68,6 +80,11 @@ class Pareto:
     def x_min(self) -> float:
         return (self.alpha - 1) / self.alpha
 
+    @property
+    def cv2(self) -> float:
+        """1 / (alpha (alpha - 2)) for alpha > 2, infinite otherwise."""
+        return 1 / (self.alpha * (self.alpha - 2)) if self.alpha > 2 else math.inf
+
     def sample(self, rng: np.random.Generator, size) -> np.ndarray:
         u = rng.random(size)                                   # in [0, 1)
         return self.x_min * (1.0 - u) ** (-1.0 / self.alpha)   # inverse CDF
@@ -82,6 +99,10 @@ class LogNormal:
     @property
     def label(self) -> str:
         return f"lognormal(s={self.sigma:g})"
+
+    @property
+    def cv2(self) -> float:
+        return math.expm1(self.sigma ** 2)
 
     def sample(self, rng: np.random.Generator, size) -> np.ndarray:
         return rng.lognormal(-0.5 * self.sigma ** 2, self.sigma, size)
@@ -105,6 +126,11 @@ class Bimodal:
     @property
     def label(self) -> str:
         return f"bimodal(p={self.p:g},r={self.ratio:g})"
+
+    @property
+    def cv2(self) -> float:
+        small = 1.0 / (1 - self.p + self.p * self.ratio)
+        return (1 - self.p) * small ** 2 + self.p * (self.ratio * small) ** 2 - 1
 
     def sample(self, rng: np.random.Generator, size) -> np.ndarray:
         small = 1.0 / (1 - self.p + self.p * self.ratio)
@@ -148,6 +174,15 @@ class Empirical:
         x = np.asarray(self.sizes, dtype=float)
         F = np.asarray(self.cdf, dtype=float)
         return float(F[0] * x[0] + np.sum(np.diff(F) * (x[:-1] + x[1:]) / 2))
+
+    @property
+    def cv2(self) -> float:
+        """Exact for the piecewise-linear CDF: uniform between neighboring points."""
+        x = np.asarray(self.sizes, dtype=float)
+        F = np.asarray(self.cdf, dtype=float)
+        a, b = x[:-1], x[1:]
+        second = F[0] * x[0] ** 2 + np.sum(np.diff(F) * (a * a + a * b + b * b) / 3)
+        return float(second / self.raw_mean ** 2 - 1)
 
     def sample(self, rng: np.random.Generator, size) -> np.ndarray:
         u = rng.random(size)
