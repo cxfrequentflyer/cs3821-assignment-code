@@ -102,3 +102,88 @@ def chunk_flows(w, c):
             rank += 1
         out.append((size, i, rank))
     return out
+
+
+# ---- time: draining queues (ecmpsim/dynamic.py) ----
+
+def queue_drill(w, picks, gaps, n, memory=0, engines=1, speeds=None):
+    """`drill` over time, one trial: before flow j arrives, gaps[j] time units
+    pass and every path's clearing time drops by that much (not below 0).
+    Candidates are compared on the clearing time (in the round's snapshot when
+    engines > 1); ties keep the earlier candidate."""
+    speed = [1.0] * n if speeds is None else list(speeds)
+    q = [0.0] * n
+    mem = [[] for _ in range(engines)]
+    snapshot = list(q)
+    paths = []
+    for j in range(len(w)):
+        q = [max(x - gaps[j], 0.0) for x in q]
+        e = j % engines
+        if engines == 1 or e == 0:
+            snapshot = list(q)
+        cands = [int(c) for c in picks[j]] + mem[e]
+        best = 0
+        for i in range(1, len(cands)):
+            if snapshot[cands[i]] < snapshot[cands[best]]:
+                best = i
+        p = cands[best]
+        paths.append(p)
+        q[p] += w[j] / speed[p]
+        if memory:
+            others = []
+            for c in cands:
+                if c != p and c not in others:
+                    others.append(c)
+            others.sort(key=lambda c: snapshot[c])
+            mem[e] = ([p] + others)[:memory]
+    return paths
+
+
+def queue_waits(paths, w, gaps, n, speeds=None):
+    """Per flow: how long it waits before its first byte is sent, working one
+    path at a time. A path is a FIFO server, so flow j starts when both it has
+    arrived and the previous flow on its path has finished (Lindley)."""
+    speed = [1.0] * n if speeds is None else list(speeds)
+    free_at = [0.0] * n
+    now, waits = 0.0, []
+    for j in range(len(w)):
+        now += gaps[j]
+        p = paths[j]
+        start = max(now, free_at[p])
+        waits.append(start - now)
+        free_at[p] = start + w[j] / speed[p]
+    return waits
+
+
+# ---- real hashes (ecmpsim/hashing.py) ----
+
+def crc_bitwise(data, width, poly, init, reflected, xorout):
+    """The textbook bit-at-a-time CRC of a list of byte values."""
+    def flip(x, bits):
+        return int(f"{x:0{bits}b}"[::-1], 2)
+    mask = (1 << width) - 1
+    reg = init
+    for byte in data:
+        if reflected:
+            byte = flip(byte, 8)
+        reg ^= byte << (width - 8)
+        for _ in range(8):
+            reg = ((reg << 1) ^ poly) & mask if reg >> (width - 1) else (reg << 1) & mask
+    if reflected:
+        reg = flip(reg, width)
+    return reg ^ xorout
+
+
+# ---- fat-tree (ecmpsim/fattree.py) ----
+
+def fattree_loads(flows, choice):
+    """Link loads of one trial as a dict keyed by named links. `flows` is a
+    list of (ps, es, pd, ed, w) and `choice` a list of (a, c)."""
+    loads = {}
+    for (ps, es, pd, ed, w), (a, c) in zip(flows, choice):
+        hops = [("edge_up", ps, es, a), ("agg_down", pd, a, ed)]
+        if ps != pd:
+            hops += [("agg_up", ps, a, c), ("core_down", pd, a, c)]
+        for hop in hops:
+            loads[hop] = loads.get(hop, 0.0) + w
+    return loads
