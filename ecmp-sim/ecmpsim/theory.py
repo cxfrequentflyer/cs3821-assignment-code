@@ -228,3 +228,56 @@ def dchoice_util_lower_bound(speeds, d: int, replace: bool = False) -> float:
             q = math.comb(n - a, d) / math.comb(n, d) if n - a >= d else 0.0
         best = max(best, q * S / (S - s[:a].sum()))
     return best
+
+
+# --------------------------------------------------------------------------
+# Time: queues that drain (dynamic.py)
+# --------------------------------------------------------------------------
+
+def mg1_wait(rho: float, cv2: float, speed: float = 1.0) -> float:
+    """Mean time a flow waits in an M/G/1 queue (Pollaczek-Khinchine):
+
+        E[W] = rho (1 + CV^2) E[service] / (2 (1 - rho)),   E[service] = 1 / speed.
+
+    With ECMP and Poisson arrivals every path is exactly this queue (a
+    Poisson stream split at random is Poisson), at rho = the offered load
+    when speeds are equal. Infinite for rho >= 1 or infinite variance: with
+    Pareto(alpha <= 2) sizes the mean wait is infinite at ANY load.
+    """
+    if rho >= 1 or math.isinf(cv2):
+        return math.inf
+    return rho * (1 + cv2) / (2 * (1 - rho) * speed)
+
+
+def mg1_idle(rho: float) -> float:
+    """Fraction of time a single-server queue at load rho < 1 is empty."""
+    return max(1 - rho, 0.0)
+
+
+def dchoice_pileup(speeds, d: int, load: float, replace: bool = False) -> float:
+    """Lower bound on the share of the offered traffic that piles up for ever
+    under ANY memoryless rule choosing among d sampled paths, at offered load
+    `load` (DRILL Theorem 1, run over time; metric `growth` in dynamic.py).
+
+    The counting step of dchoice_util_lower_bound: a fraction q_a of the
+    flows samples none of the a fastest paths, and the remaining paths can
+    only carry (S - S_A) / (load * S) of the offered traffic. 0 means the
+    argument finds no overload. d = 1 is ECMP, for which the bound is exact
+    with a = the set of paths that are not overloaded.
+    """
+    s = np.sort(np.asarray(speeds, dtype=float))[::-1]
+    n, S = len(s), s.sum()
+    worst = 0.0
+    for a in range(0, n):
+        if replace:
+            q = (1 - a / n) ** d
+        else:
+            q = math.comb(n - a, d) / math.comb(n, d) if n - a >= d else 0.0
+        worst = max(worst, q - (S - s[:a].sum()) / (load * S))
+    return worst
+
+
+def dchoice_stable_load(speeds, d: int, replace: bool = False) -> float:
+    """The largest offered load at which a memoryless d-choice rule can still
+    be stable according to the counting bound: 1 / dchoice_util_lower_bound."""
+    return 1.0 / dchoice_util_lower_bound(speeds, d, replace)

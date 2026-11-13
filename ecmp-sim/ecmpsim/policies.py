@@ -20,6 +20,9 @@ array of paths in 0..n-1.
 Extra context, passed by keyword only to the policies that use it:
     speeds      (n,) relative path capacities. Load-aware policies compare
                 utilization, load / speed, instead of raw load.
+    gaps        (T, m) inter-arrival times, for runs over time
+                (dynamic.run_dynamic): paths drain between arrivals, and the
+                load-aware policies compare what is left.
     flow, rank  (T, m) for chunked runs (runner.run(chunk=...)): the flow each
                 chunk belongs to and its position inside that flow. Only
                 policies with `uses_flow = True` get them (Spray).
@@ -78,7 +81,7 @@ class ECMP:
         return "ECMP()"
 
 
-def _place(w, cand, n, *, inc, speeds=None, engines=1, memory=0, tiekeys=None):
+def _place(w, cand, n, *, inc, speeds=None, engines=1, memory=0, tiekeys=None, gaps=None):
     """The sequential placement loop shared by DChoice and Greedy.
 
     cand(j) gives the (T, k) candidate paths of flow j. Each flow goes to the
@@ -87,6 +90,11 @@ def _place(w, cand, n, *, inc, speeds=None, engines=1, memory=0, tiekeys=None):
     With `memory`, each engine also considers the paths it remembered last
     time and then remembers the `memory` best distinct candidates it just
     saw, the chosen path first (DRILL(d, m)). Memory slots start empty.
+
+    With `gaps` (T, m), time passes: gaps[:, j] is the time between flow j - 1
+    and flow j, and every path works its backlog off at its speed in between,
+    so a utilization is the time the path needs to clear what it holds (see
+    dynamic.py). A stale snapshot (engines > 1) does not drain.
     """
     T, m = w.shape
     rows = np.arange(T)
@@ -96,6 +104,9 @@ def _place(w, cand, n, *, inc, speeds=None, engines=1, memory=0, tiekeys=None):
     mem = np.full((T, engines, memory), -1, dtype=np.int64)
     paths = np.empty((T, m), dtype=np.int64)
     for j in range(m):                        # flows arrive one at a time...
+        if gaps is not None:                  # ...and the paths drain in between
+            util -= gaps[:, j, None]
+            np.maximum(util, 0.0, out=util)
         f = j % engines
         if engines > 1 and f == 0:
             view = util.copy()                # a new round: everyone reads this snapshot
@@ -181,11 +192,11 @@ class DChoice:
             return picks, rng.random((m, self.d + self.memory))
         return picks
 
-    def assign(self, w: np.ndarray, draws, n: int, speeds=None, **_) -> np.ndarray:
+    def assign(self, w: np.ndarray, draws, n: int, speeds=None, gaps=None, **_) -> np.ndarray:
         picks, keys = draws if self.ties == "random" else (draws, None)
         inc = w if self.by == "bytes" else (w > 0).astype(float)
         return _place(w, lambda j: picks[:, j, :], n, inc=inc, speeds=speeds,
-                      engines=self.engines, memory=self.memory, tiekeys=keys)
+                      engines=self.engines, memory=self.memory, tiekeys=keys, gaps=gaps)
 
     def __repr__(self):
         return (f"DChoice(d={self.d}, by={self.by!r}, replace={self.replace}, "
@@ -212,11 +223,11 @@ class Greedy:
     def draw(self, rng, m, n):
         return rng.random((m, n)) if self.ties == "random" else None
 
-    def assign(self, w: np.ndarray, draws, n: int, speeds=None, **_) -> np.ndarray:
+    def assign(self, w: np.ndarray, draws, n: int, speeds=None, gaps=None, **_) -> np.ndarray:
         T = w.shape[0]
         everything = np.broadcast_to(np.arange(n), (T, n))
         return _place(w, lambda j: everything, n, inc=w, speeds=speeds,
-                      engines=self.engines, tiekeys=draws)
+                      engines=self.engines, tiekeys=draws, gaps=gaps)
 
     def __repr__(self):
         return f"Greedy(engines={self.engines}, ties={self.ties!r})"
@@ -276,6 +287,7 @@ class LPT:
     it places on the least-utilized path, which is a heuristic)."""
 
     name = "lpt"
+    offline = True          # needs the future: not usable in runs over time
 
     def draw(self, rng, m, n):
         return None
