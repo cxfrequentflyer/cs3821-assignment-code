@@ -1,6 +1,6 @@
 # ecmpsim: balls into bins for ECMP groups, leaf-spine fabrics and fat-trees
 
-Level 1 of the COMP3821 project simulator: flows (balls) are placed onto the
+The COMP3821 project ECMP simulator: flows (balls) are placed onto the
 `n` equal-cost paths (bins) of a single ECMP group, and we measure how unevenly
 the paths end up loaded. It is small on purpose, checked against exact answers,
 and built so that every number in the report can be regenerated from a seed.
@@ -196,7 +196,7 @@ Modeling choices to state for the extensions:
 
 ## Fat-tree, real hashes and time
 
-Three levels that used to be listed here as "not modeled yet".
+Implementations of these additional features.
 
 | Script | Idea | Paper hook | Headline so far (default settings) |
 |---|---|---|---|
@@ -258,6 +258,8 @@ bytes before or after the header) only XORs a constant into the result, which
 permutes the buckets instead of mixing them: the test suite checks that
 identity and that each edge switch still reaches only k/2 of its (k/2)^2
 paths. A different polynomial or different bits at the second tier do fix it.
+
+Note that one of our other group members (Stella Yan) has also conducted experiments on the topic of hashing, so I leave this section for further reading.
 
 ### Time (`dynamic.py`)
 
@@ -322,7 +324,7 @@ errors, and DRILL's Theorem 1 pile-up rate (`theory.dchoice_pileup`).
 - **Reference implementations** for these levels were again written by the
   same author as the fast code.
 
-## Not modeled yet (natural next levels)
+## Ideas for further exploration (beyond the scope of our project)
 
 - **A fat-tree over time**: `dynamic.py` is one ECMP group; queues at every
   tier (and DRILL's per-packet decisions at each hop) need the two combined.
