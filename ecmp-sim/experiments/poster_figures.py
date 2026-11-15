@@ -2,7 +2,7 @@
 
 Run exp03, exp09 and exp11 first (they write the CSVs), then:
 
-    python experiments/poster_figures.py
+    python experiments/poster_figures.py [--transparent]
 
 Writes PNG (300 dpi) and PDF versions into results/poster/:
 
@@ -31,6 +31,7 @@ RES = ROOT / "results"
 OUT = RES / "poster"
 BLUE, ORANGE = ps.SERIES[0], ps.SERIES[1]
 SEED = 3821
+BG, SUFFIX = ps.SURFACE, ""      # --transparent: no background, files named *_transparent
 
 plt = ps.setup()
 plt.rcParams.update({"font.size": 15, "axes.titlesize": 17, "axes.labelsize": 15,
@@ -38,7 +39,7 @@ plt.rcParams.update({"font.size": 15, "axes.titlesize": 17, "axes.labelsize": 15
 
 
 def finish(fig, ax, title, xlabel, ylabel, name):
-    ax.set_facecolor(ps.SURFACE)
+    ax.set_facecolor(BG)
     ax.grid(True, axis="y", color=ps.GRID, lw=0.8)
     ax.set_axisbelow(True)
     ax.set_title(title, loc="left", color=ps.INK, fontweight="bold", pad=14)
@@ -47,7 +48,7 @@ def finish(fig, ax, title, xlabel, ylabel, name):
     fig.tight_layout()
     OUT.mkdir(parents=True, exist_ok=True)
     for ext in ("png", "pdf"):
-        fig.savefig(OUT / f"{name}.{ext}", dpi=300, facecolor=ps.SURFACE)
+        fig.savefig(OUT / f"{name}{SUFFIX}.{ext}", dpi=300, facecolor=BG)
     plt.close(fig)
     print(f"  {name}.png / .pdf")
 
@@ -56,8 +57,8 @@ def snapshot():
     n, m = 16, 64
     loads = np.bincount(np.random.default_rng(SEED).integers(0, n, m), minlength=n)
     loads = np.sort(loads)[::-1]
-    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=ps.SURFACE)
-    ax.bar(np.arange(1, n + 1), loads, width=0.72, color=BLUE, edgecolor=ps.SURFACE, lw=2)
+    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=BG)
+    ax.bar(np.arange(1, n + 1), loads, width=0.72, color=BLUE, edgecolor=BG, lw=2)
     ax.axhline(m / n, color=ps.INK_2, lw=1.5, ls=(0, (4, 3)))
     ax.annotate(f"perfectly even: {m // n} per path", (n + 0.5, m / n), xytext=(0, 6),
                 textcoords="offset points", ha="right", va="bottom", color=ps.INK_2, fontsize=13)
@@ -75,7 +76,7 @@ def snapshot():
 
 def decay():
     df = pd.read_csv(RES / "exp03_conga_bound.csv")
-    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=ps.SURFACE)
+    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=BG)
     series = [("unit", BLUE, "equal-size flows", -0.5, r"theory $m^{-1/2}$"),
               ("pareto(a=1.5)", ORANGE, r"heavy-tailed flows (Pareto $\alpha$ = 1.5)", -1 / 3,
                r"theory $m^{-1/3}$")]
@@ -84,7 +85,7 @@ def decay():
         x, y = g.m.to_numpy(), g["median"].to_numpy()
         fit = theory.fitted_exponent(g.m, g["median"])
         ax.plot(x, y[0] * (x / x[0]) ** slope, color=ps.MUTED, lw=1.5, ls=(0, (4, 3)), zorder=1)
-        ax.plot(x, y, color=color, lw=2.5, marker="o", ms=10, mec=ps.SURFACE, mew=2, zorder=2)
+        ax.plot(x, y, color=color, lw=2.5, marker="o", ms=10, mec=BG, mew=2, zorder=2)
         text = f"{name}\nfitted slope \u2212{abs(fit):.2f}  ({tname}, dashed)"
         if color == ORANGE:
             ax.annotate(text, (x[1], y[1]), xytext=(14, 16), textcoords="offset points",
@@ -109,7 +110,7 @@ def fattree():
     e = df[df.flows == "exp"].groupby(["topology", "policy"]).over_opt.mean()
     scen = [("symmetric", "healthy fabric"), ("slow core link", "one slow core link")]
     pols = [("ecmp", "ECMP", BLUE), ("global", "least-congested path", ORANGE)]
-    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=ps.SURFACE)
+    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=BG)
     w = 0.34
     for j, (p, pname, color) in enumerate(pols):
         vals = [e[(s, p)] for s, _ in scen]
@@ -134,14 +135,14 @@ def fattree():
 def wait():
     b = pd.read_csv(RES / "exp11_time_b.csv")
     g = b[b.flows == "exp"].groupby(["policy", "load"]).wait_mean.mean()
-    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=ps.SURFACE)
+    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=BG)
     x = np.linspace(0.5, 0.95, 200)
     ax.plot(x, [theory.mg1_wait(r, 1.0) for r in x], color=ps.MUTED, lw=1.5, ls=(0, (4, 3)),
             zorder=1)
     for p, name, color, off in [("ecmp", "ECMP (dashed: queueing theory)", BLUE, (-12, 8)),
                                 ("d2-bytes-distinct", "two choices", ORANGE, (-12, -18))]:
         s = g[p]
-        ax.plot(s.index, s.values, color=color, lw=2.5, marker="o", ms=10, mec=ps.SURFACE, mew=2,
+        ax.plot(s.index, s.values, color=color, lw=2.5, marker="o", ms=10, mec=BG, mew=2,
                 zorder=2)
         ax.annotate(name, (s.index[2], s.values[2]), xytext=off, textcoords="offset points",
                     ha="right" if color == BLUE else "left", color=ps.INK, fontsize=13,
@@ -163,7 +164,7 @@ def wait():
 def schematic():
     """An illustration, not a simulation: six flows, one of them an elephant, on four paths."""
     from matplotlib.patches import FancyBboxPatch
-    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=ps.SURFACE)
+    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=BG)
     ax.set_xlim(0, 12.6)
     ax.set_ylim(0, 6.6)
     ax.axis("off")
@@ -185,7 +186,7 @@ def schematic():
     ax.text(0.25, 0.75, "one elephant,\nfive mice", fontsize=12, color=ps.INK_2, va="top")
 
     # the switch
-    box(3.1, 2.25, 2.3, 2.1, ps.SURFACE, ec=ps.INK_2, lw=1.8, r=0.2)
+    box(3.1, 2.25, 2.3, 2.1, BG, ec=ps.INK_2, lw=1.8, r=0.2)
     ax.text(4.25, 3.3, "switch\nhash(5-tuple)\nmod 4", ha="center", va="center", fontsize=13,
             color=ps.INK, linespacing=1.35)
     ax.annotate("", (3.05, 3.3), (2.15, 3.3),
@@ -211,12 +212,14 @@ def schematic():
     fig.tight_layout()
     OUT.mkdir(parents=True, exist_ok=True)
     for ext in ("png", "pdf"):
-        fig.savefig(OUT / f"poster_schematic.{ext}", dpi=300, facecolor=ps.SURFACE)
+        fig.savefig(OUT / f"poster_schematic{SUFFIX}.{ext}", dpi=300, facecolor=BG)
     plt.close(fig)
     print("  poster_schematic.png / .pdf")
 
 
 if __name__ == "__main__":
+    if "--transparent" in sys.argv:
+        BG, SUFFIX = "none", "_transparent"
     print(f"writing to {OUT.relative_to(ROOT)}/")
     schematic()
     snapshot()
