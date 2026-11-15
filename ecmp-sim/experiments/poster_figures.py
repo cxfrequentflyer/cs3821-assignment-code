@@ -10,6 +10,7 @@ Writes PNG (300 dpi) and PDF versions into results/poster/:
     poster_decay      imbalance vs number of flows: unit flows against Pareto(1.5)
     poster_fattree    busiest link / optimum in a k = 8 fat-tree, ECMP vs global information
     poster_wait       waiting time vs load: ECMP on the queueing formula, two choices below it
+    poster_schematic  illustration (not data): a switch hashing flows onto 4 equal-cost paths
 
 Fonts are sized for a half-width column of an A2 poster.
 """
@@ -159,8 +160,65 @@ def wait():
            "offered load", "mean wait (flow transmission times)", "poster_wait")
 
 
+def schematic():
+    """An illustration, not a simulation: six flows, one of them an elephant, on four paths."""
+    from matplotlib.patches import FancyBboxPatch
+    fig, ax = plt.subplots(figsize=(8, 4.8), facecolor=ps.SURFACE)
+    ax.set_xlim(0, 12.6)
+    ax.set_ylim(0, 6.6)
+    ax.axis("off")
+    MOUSE, ELEPHANT, H = 0.7, 1.7, 0.46
+
+    def box(x, y, w, h, fc, ec="none", lw=0, r=0.12, z=2):
+        ax.add_patch(FancyBboxPatch((x + r, y + r), w - 2 * r, h - 2 * r, zorder=z, fc=fc, ec=ec,
+                                    lw=lw, boxstyle=f"round,pad={r}"))
+
+    def flow(x, yc, big=False):
+        w = ELEPHANT if big else MOUSE
+        box(x, yc - H / 2, w, H, ORANGE if big else BLUE, z=3)
+        return x + w + 0.1
+
+    # the flows waiting on the left, one of them much larger than the rest
+    for i, big in enumerate([False, True, False, False, False, False]):
+        flow(0.25, 4.95 - i * 0.68, big)
+    ax.text(0.25, 5.6, "flows = balls", fontsize=14, fontweight="bold", color=ps.INK)
+    ax.text(0.25, 0.75, "one elephant,\nfive mice", fontsize=12, color=ps.INK_2, va="top")
+
+    # the switch
+    box(3.1, 2.25, 2.3, 2.1, ps.SURFACE, ec=ps.INK_2, lw=1.8, r=0.2)
+    ax.text(4.25, 3.3, "switch\nhash(5-tuple)\nmod 4", ha="center", va="center", fontsize=13,
+            color=ps.INK, linespacing=1.35)
+    ax.annotate("", (3.05, 3.3), (2.15, 3.3),
+                arrowprops=dict(arrowstyle="-|>", color=ps.INK_2, lw=1.8))
+
+    # four equal-cost paths, loaded as one unlucky hash would load them
+    lanes = [(5.0, [True, False, False], "busiest link"), (3.7, [False, False], ""),
+             (2.4, [False], ""), (1.1, [], "idle")]
+    for k, (yc, flows, note) in enumerate(lanes):
+        ax.annotate("", (6.45, yc), (5.45, 3.3 + (yc - 3.05) * 0.25),
+                    arrowprops=dict(arrowstyle="-|>", color=ps.INK_2, lw=1.5))
+        box(6.5, yc - 0.4, 3.75, 0.8, ps.GRID, r=0.15, z=1)
+        x = 6.65
+        for big in flows:
+            x = flow(x, yc, big)
+        ax.text(10.4, yc, f"path {k + 1}", fontsize=13, color=ps.INK_2, va="center")
+        if note:
+            ax.text(11.55, yc, note, fontsize=12, color=ps.INK, va="center", fontweight="bold",
+                    ha="left")
+    ax.text(6.5, 5.6, "equal-cost paths = bins", fontsize=14, fontweight="bold", color=ps.INK)
+    ax.set_title("ECMP: every flow is hashed onto one path, whatever its load", loc="left",
+                 color=ps.INK, fontweight="bold", pad=6)
+    fig.tight_layout()
+    OUT.mkdir(parents=True, exist_ok=True)
+    for ext in ("png", "pdf"):
+        fig.savefig(OUT / f"poster_schematic.{ext}", dpi=300, facecolor=ps.SURFACE)
+    plt.close(fig)
+    print("  poster_schematic.png / .pdf")
+
+
 if __name__ == "__main__":
     print(f"writing to {OUT.relative_to(ROOT)}/")
+    schematic()
     snapshot()
     decay()
     fattree()
