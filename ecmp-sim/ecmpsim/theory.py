@@ -142,3 +142,142 @@ def fluid_expected_max(m: int, n: int, d: int) -> float:
     i = np.arange(len(s))
     p_at_least = np.where(i <= -(-m // n), 1.0, -np.expm1(-n * s))
     return float(p_at_least[1:].sum())
+
+
+# --------------------------------------------------------------------------
+# Weighted flows: CONGA's imbalance theorem and what replaces it
+# --------------------------------------------------------------------------
+
+def conga_imbalance_bound(m: float, n: int, cv2: float) -> float:
+    """CONGA (Alizadeh et al., SIGCOMM 2014), Theorem 2, read in this model.
+
+    Flows of random size S arrive as a Poisson process of rate lambda, each to
+    a uniformly random one of n links. If E[exp(theta S)] is finite near 0,
+    then for t large enough
+
+        E[chi(t)] <= 1 / sqrt(lambda_e t) + o(1 / sqrt(t)),
+        lambda_e = lambda / (8 n ln n (1 + (sigma_S / E[S])^2)),
+
+    where chi(t) = (busiest - least loaded link) / (expected load per link)
+    is metrics' `imbalance`. Reading lambda t as the number of flows m gives
+    sqrt(8 n ln n (1 + CV^2) / m).
+
+    Caveats to state when quoting it: it is asymptotic in t (the o-term is
+    unspecified, so "the bound holds at m = 4096" is an observation, not a
+    guarantee); the theorem has Poisson(m) flows rather than exactly m; and
+    the light-tail condition fails for lognormal and Pareto. The formula
+    still needs only CV^2 < inf, which lognormal has and Pareto(alpha <= 2)
+    does not; then it returns inf.
+    """
+    if math.isinf(cv2):
+        return math.inf
+    return math.sqrt(8 * n * math.log(n) * (1 + cv2) / m)
+
+
+def imbalance_decay_exponent(alpha: float | None = None) -> float:
+    """How fast the imbalance shrinks with the number of flows: E[chi] ~ m^exponent.
+
+    With finite variance the per-link loads obey the central limit theorem,
+    so fluctuations grow like sqrt(m) against a mean of order m: exponent
+    -1/2, the 1/sqrt(t) in CONGA's theorem. With a Pareto tail of index
+    1 < alpha < 2 the variance is infinite and the generalized CLT applies
+    instead: sums fluctuate on the scale m^(1/alpha), so the exponent is
+    -(1 - 1/alpha). For alpha = 1.5 that is -1/3, i.e. 16x more flows cut
+    the imbalance by 16^(1/3) = 2.5x, not 4x. alpha = None means finite
+    variance. This is a scaling heuristic (no constant), to fit slopes against.
+    """
+    if alpha is None or alpha >= 2:
+        return -0.5
+    if alpha <= 1:
+        raise ValueError("alpha must be > 1 (finite mean)")
+    return -(1 - 1 / alpha)
+
+
+def fitted_exponent(m, imbalance) -> float:
+    """Least-squares slope of log(imbalance) against log(m)."""
+    return float(np.polyfit(np.log(np.asarray(m, float)), np.log(np.asarray(imbalance, float)), 1)[0])
+
+
+# --------------------------------------------------------------------------
+# Unequal path speeds: DRILL's Theorem 1, in a static snapshot
+# --------------------------------------------------------------------------
+
+def dchoice_util_lower_bound(speeds, d: int, replace: bool = False) -> float:
+    """Lower bound on E[busiest utilization] / ideal for ANY rule that picks
+    among d random samples with no memory (DRILL(d, 0), Ghorbani et al.,
+    SIGCOMM 2017, Theorem 1), when paths have unequal speeds.
+
+    The argument is the theorem's counting step. Take A = the a fastest
+    paths. A flow can only land in A if one of its samples does, which
+    happens with probability 1 - q_a, where q_a = C(n - a, d) / C(n, d)
+    (distinct samples) or (1 - a/n)^d (with replacement). So in expectation
+    at least a fraction q_a of the bytes lands outside A, on paths with total
+    speed S - S_A, and the busiest of those runs at utilization at least
+    q_a * total / (S - S_A). Dividing by the ideal total / S and taking the
+    best a gives the bound. It ignores fluctuations of the total, so it is a
+    statement about means. It is 1 or less when d samples are enough; memory
+    (DRILL(d, m >= 1)) escapes it, which is DRILL's Theorem 2.
+    """
+    s = np.sort(np.asarray(speeds, dtype=float))[::-1]
+    n, S = len(s), s.sum()
+    best = 1.0
+    for a in range(1, n):
+        if replace:
+            q = (1 - a / n) ** d
+        else:
+            q = math.comb(n - a, d) / math.comb(n, d) if n - a >= d else 0.0
+        best = max(best, q * S / (S - s[:a].sum()))
+    return best
+
+
+# --------------------------------------------------------------------------
+# Time: queues that drain (dynamic.py)
+# --------------------------------------------------------------------------
+
+def mg1_wait(rho: float, cv2: float, speed: float = 1.0) -> float:
+    """Mean time a flow waits in an M/G/1 queue (Pollaczek-Khinchine):
+
+        E[W] = rho (1 + CV^2) E[service] / (2 (1 - rho)),   E[service] = 1 / speed.
+
+    With ECMP and Poisson arrivals every path is exactly this queue (a
+    Poisson stream split at random is Poisson), at rho = the offered load
+    when speeds are equal. Infinite for rho >= 1 or infinite variance: with
+    Pareto(alpha <= 2) sizes the mean wait is infinite at ANY load.
+    """
+    if rho >= 1 or math.isinf(cv2):
+        return math.inf
+    return rho * (1 + cv2) / (2 * (1 - rho) * speed)
+
+
+def mg1_idle(rho: float) -> float:
+    """Fraction of time a single-server queue at load rho < 1 is empty."""
+    return max(1 - rho, 0.0)
+
+
+def dchoice_pileup(speeds, d: int, load: float, replace: bool = False) -> float:
+    """Lower bound on the share of the offered traffic that piles up for ever
+    under ANY memoryless rule choosing among d sampled paths, at offered load
+    `load` (DRILL Theorem 1, run over time; metric `growth` in dynamic.py).
+
+    The counting step of dchoice_util_lower_bound: a fraction q_a of the
+    flows samples none of the a fastest paths, and the remaining paths can
+    only carry (S - S_A) / (load * S) of the offered traffic. 0 means the
+    argument finds no overload. d = 1 is ECMP, for which the bound is exact
+    with a = the set of paths that are not overloaded.
+    """
+    s = np.sort(np.asarray(speeds, dtype=float))[::-1]
+    n, S = len(s), s.sum()
+    worst = 0.0
+    for a in range(0, n):
+        if replace:
+            q = (1 - a / n) ** d
+        else:
+            q = math.comb(n - a, d) / math.comb(n, d) if n - a >= d else 0.0
+        worst = max(worst, q - (S - s[:a].sum()) / (load * S))
+    return worst
+
+
+def dchoice_stable_load(speeds, d: int, replace: bool = False) -> float:
+    """The largest offered load at which a memoryless d-choice rule can still
+    be stable according to the counting bound: 1 / dchoice_util_lower_bound."""
+    return 1.0 / dchoice_util_lower_bound(speeds, d, replace)

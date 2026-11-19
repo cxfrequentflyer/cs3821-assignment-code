@@ -230,3 +230,6 @@ results/*
 
 # macOS DS_Store files
 .DS_Store
+
+# ns-3 scratch example needs its lib/ folder (the Python "lib/" rule above would hide it)
+!ns-3-sim/**/lib/

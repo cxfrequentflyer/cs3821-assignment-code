@@ -1,9 +1,9 @@
 [project]
 name = "ecmpsim"
 version = "0.1.0"
-description = "Balls-into-bins simulator for a single ECMP group (COMP3821 project)"
+description = "Balls-into-bins simulator for ECMP groups and leaf-spine fabrics (COMP3821 project)"
 requires-python = ">=3.9"
-dependencies = ["numpy>=1.22", "pandas>=1.4", "matplotlib>=3.5"]
+dependencies = ["numpy>=1.22", "pandas>=1.4", "matplotlib>=3.5", "scipy>=1.8"]
 
 [project.optional-dependencies]
 test = ["pytest>=7"]

@@ -1,0 +1,21 @@
+# Web search flow-size CDF (Alizadeh et al., DCTCP, SIGCOMM 2010), as used by
+# pFabric (SIGCOMM 2013, Fig. 4a) and CONGA (SIGCOMM 2014).
+# Columns: size in 1460-byte packets, cumulative probability. Linear between
+# points (Empirical reads it that way). This is the transcription that
+# circulates with the pFabric/CONGA simulation code; it matches pFabric §5's
+# summary ("over 95% of all bytes are from the 30% of the flows that are
+# 1-20MB"), which tests/test_workloads.py checks. Verify against the original
+# figure before quoting exact numbers.
+# size_pkts  cdf
+6       0
+6       0.15
+13      0.2
+19      0.3
+33      0.4
+53      0.53
+133     0.6
+667     0.7
+1333    0.8
+3333    0.9
+6667    0.97
+20000   1
