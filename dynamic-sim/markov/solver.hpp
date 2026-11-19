@@ -38,7 +38,7 @@ public:
 
     // Saves as a CSV where each row is a node: first the state, then pairs of
     // next state and the probability of that transition. States are written in
-    // hexadecimal with one digit per bin, e.g. 00113.
+    // hexadecimal with one digit per bin, fullest first, e.g. 31100.
     void save(const string &path = "chain.csv") const {
         ofstream out(path);
         auto hexState = [&](uint32_t s) -> ostream & {

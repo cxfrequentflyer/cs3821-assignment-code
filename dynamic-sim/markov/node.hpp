@@ -9,7 +9,8 @@
 using namespace std;
 
 // A configuration of bins: one hex digit per bin holding its number of balls,
-// sorted so equal configurations share a code. Empty bins are implicit leading zeros.
+// sorted so equal configurations share a code. The fullest bin is the most
+// significant digit and empty bins are the trailing zeros, e.g. 0x31100.
 class Node {
 public:
     inline static int numBins = 5;      // at most 8
@@ -75,9 +76,10 @@ private:
         return c;
     }
 
+    // fullest bins first, so they end up in the most significant digits
     static uint32_t encode(const array<int, 16> &c) {
         uint32_t s = 0;
-        for (uint32_t k = 1; k < 16; ++k)
+        for (int k = 15; k >= 0; --k)
             for (int i = 0; i < c[k]; ++i) s = s << 4 | k;
         return s;
     }

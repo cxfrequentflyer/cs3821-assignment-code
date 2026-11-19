@@ -32,6 +32,14 @@ AREA = 3000   # marker area in points^2 for probability 1
 RAD = 0.2     # how far arrows bend
 
 
+# paper: the background, which label boxes and node rings also take on so they blend in
+THEMES = {
+    "plain": dict(paper="white", ink="black", node="#2a78d6", edge="0.55", grid="0.9"),
+    "lavender": dict(paper="#e8e1f4", ink="#2b2240", node="#5b3f9e", edge="#7d6b9f", grid="#d3c6ea"),
+}
+THEME = THEMES["plain"]
+
+
 def read_chain(path):
     """{state: [(next state, probability), ...]}"""
     chain = {}
@@ -87,9 +95,9 @@ def draw_loop(ax, centre, r, p):
     # points -> inches -> screen, then shifted to wherever the state sits on screen
     points = Affine2D().scale(1 / 72) + ax.figure.dpi_scale_trans + ScaledTranslation(*centre, ax.transData)
     ax.add_patch(FancyArrowPatch(path=loop, transform=points, arrowstyle="-|>", mutation_scale=9,
-                                 linewidth=0.4 + 5 * p, color="0.55", alpha=0.7))
+                                 linewidth=0.4 + 5 * p, color=THEME["edge"], alpha=0.75))
     ax.annotate(f"{p:.0%}", centre, textcoords="offset points", xytext=(0, 0.23 * r * s + 0.75 * h),
-                ha="center", va="center", fontsize=6, bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none", alpha=0.85))
+                ha="center", va="center", fontsize=6, bbox=dict(boxstyle="round,pad=0.12", fc=THEME["paper"], ec="none", alpha=0.85))
 
 
 def draw(ax, chain, pi, top, min_p, limits, title):
@@ -98,7 +106,7 @@ def draw(ax, chain, pi, top, min_p, limits, title):
     ax.set(title=title, xlabel="total balls", ylabel="longest queue", xlim=limits[0], ylim=limits[1])
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    ax.grid(color="0.9", linewidth=0.8)
+    ax.grid(color=THEME["grid"], linewidth=0.8)
     ax.set_axisbelow(True)
 
     def midpoint(a, b):
@@ -116,12 +124,12 @@ def draw(ax, chain, pi, top, min_p, limits, title):
                 draw_loop(ax, xy[a], radius[a], p)
                 continue
             ax.add_patch(FancyArrowPatch(xy[a], xy[b], connectionstyle=f"arc3,rad={RAD}", arrowstyle="-|>",
-                                         mutation_scale=9, linewidth=0.4 + 5 * p, color="0.55", alpha=0.7,
+                                         mutation_scale=9, linewidth=0.4 + 5 * p, color=THEME["edge"], alpha=0.75,
                                          shrinkA=radius[a], shrinkB=radius[b] + 2))
             ax.text(*midpoint(a, b), f"{p:.0%}", fontsize=6, ha="center", va="center",
-                    bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none", alpha=0.85))
+                    bbox=dict(boxstyle="round,pad=0.12", fc=THEME["paper"], ec="none", alpha=0.85))
     for s in top:
-        ax.scatter(*xy[s], s=max(AREA * pi[s], 10), color="#2a78d6", edgecolor="white", linewidth=1.2, zorder=3)
+        ax.scatter(*xy[s], s=max(AREA * pi[s], 10), color=THEME["node"], edgecolor=THEME["paper"], linewidth=1.2, zorder=3)
         ax.annotate(s, xy[s], textcoords="offset points", xytext=(0, -radius[s] - 9), ha="center",
                     fontsize=7, family="monospace")
 
@@ -135,11 +143,19 @@ def main():
     ap.add_argument("--min-p", type=float, default=0.10, help="hide transitions below this probability (default 0.10)")
     ap.add_argument("--shared-axes", action="store_true",
                     help="give every panel the same axis ranges, so positions compare across panels")
+    ap.add_argument("--titles", nargs="+", help="a heading per CSV in place of its file name, e.g. '1 choice' '2 choices'")
+    ap.add_argument("--theme", choices=THEMES, default="plain", help="colours: plain, or lavender for the poster")
+    ap.add_argument("--transparent", action="store_true", help="no background, for placing over a poster")
     ap.add_argument("-o", "--out", help="output image, .png/.pdf/.svg (default: next to the first CSV)")
     args = ap.parse_args()
+    global THEME
+    THEME = THEMES[args.theme]
+    plt.rcParams.update({key: THEME["paper"] for key in ("figure.facecolor", "axes.facecolor", "savefig.facecolor")})
+    plt.rcParams.update({key: THEME["ink"] for key in ("text.color", "axes.labelcolor", "axes.edgecolor",
+                                                       "xtick.color", "ytick.color")})
 
     panels = []
-    for path in args.csv:
+    for k, path in enumerate(args.csv):
         chain = read_chain(path)
         pi = stationary(chain)
         top, covered = [], 0.0
@@ -148,7 +164,8 @@ def main():
                 break
             top.append(s)
             covered += pi[s]
-        title = f"{Path(path).stem}\n{len(top)} likeliest of {len(chain):,} states ({covered:.0%} of the time)"
+        heading = args.titles[k] if args.titles and k < len(args.titles) else Path(path).stem
+        title = f"{heading}\n{len(top)} likeliest of {len(chain):,} states ({covered:.0%} of the time)"
         panels.append((chain, pi, top, title))
         print(f"{path}: {len(chain)} states; top {len(top)} hold {covered:.1%}")
 
@@ -158,7 +175,7 @@ def main():
         draw(ax, chain, pi, top, args.min_p, shared if args.shared_axes else fit(top), title)
     fig.tight_layout()
     out = args.out or str(Path(args.csv[0]).with_name(Path(args.csv[0]).stem + "_graph.png"))
-    fig.savefig(out, dpi=200)
+    fig.savefig(out, dpi=200, transparent=args.transparent)
     print(f"saved {out}")
 
 
